@@ -1,0 +1,12 @@
+#!/bin/sh
+# Blocks commits on main: every change goes through a branch and a pull request (see CLAUDE.md).
+# Enabled by `npm install` (git config core.hooksPath .githooks).
+
+branch=$(git symbolic-ref --short -q HEAD)
+
+if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+  echo "✋ Commits on '$branch' are not allowed — create a branch first:" >&2
+  echo "     git switch -c feature/<name>   (or fix/, test/, docs/, refactor/, ci/, chore/)" >&2
+  echo "   Your staged changes move to the new branch with you." >&2
+  exit 1
+fi

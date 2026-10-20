@@ -12,6 +12,7 @@ Every change goes through a branch and a pull request, so `main` stays clean and
 - Before changing anything, create a branch from an up-to-date `main`:
   `git switch main && git pull && git switch -c <type>/<short-name>`
 - `main` only changes by merging a pull request.
+- Git hooks in `.githooks/` enforce this locally: `pre-commit` refuses commits on `main` and `pre-push` refuses pushes to it. `npm install` enables them (`git config core.hooksPath .githooks`). GitHub can't enforce it, because branch protection isn't available for private repos on the free plan. Never bypass the hooks with `--no-verify`.
 
 ### Branch names
 

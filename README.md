@@ -50,6 +50,8 @@ npm run app      # dev mode with hot reload
 npm run bundle   # release .app / .dmg in src-tauri/target/release/bundle
 ```
 
+`npm install` also enables the repo's git hooks, which keep `main` changing only through pull requests (see `CLAUDE.md`).
+
 Requirements on every OS: Node.js 20+ and Rust (stable). Plus, per OS:
 
 - **macOS:** Xcode Command Line Tools (`xcode-select --install`)
