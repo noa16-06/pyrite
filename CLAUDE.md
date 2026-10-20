@@ -3,6 +3,8 @@
 A fast, lightweight Python IDE modelled on PyCharm: Tauri 2 (Rust backend) + CodeMirror 6 frontend.
 It must work on macOS, Windows and Linux.
 
+**Start by reading [PROGRESS.md](PROGRESS.md)**: what has been built and why, what isn't verified yet, and the roadmap. Update it in the same pull request whenever a feature lands or plans change.
+
 ## Git workflow
 
 Every change goes through a branch and a pull request, so `main` stays clean and the history is easy to follow.
