@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Pyrite
+GenericName=Python IDE
+Comment=A fast, lightweight Python IDE
+Exec=pyrite
+Icon=pyrite
+Terminal=false
+Categories=Development;
+Keywords=Python;IDE;Editor;Programming;Development;
+StartupNotify=true
+StartupWMClass=pyrite
