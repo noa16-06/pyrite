@@ -37,8 +37,9 @@ pub enum LspEvent {
     Exit { stderr: String },
 }
 
-/// Reads one `Content-Length`-framed message. Returns None at end of stream.
-fn read_message(reader: &mut impl BufRead) -> Option<String> {
+/// Reads one `Content-Length`-framed message (LSP and DAP use the same framing).
+/// Returns None at end of stream.
+pub(crate) fn read_message(reader: &mut impl BufRead) -> Option<String> {
     let mut length = None;
     loop {
         let mut line = String::new();

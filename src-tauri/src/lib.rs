@@ -1,3 +1,4 @@
+mod dap;
 mod fs_ops;
 mod lsp;
 mod runner;
@@ -67,6 +68,7 @@ pub fn run() {
         .manage(runner::RunState::default())
         .manage(terminal::Terminals::default())
         .manage(lsp::LspServers::default())
+        .manage(dap::DapSessions::default())
         .invoke_handler(tauri::generate_handler![
             fs_ops::list_dir,
             fs_ops::read_file,
@@ -86,6 +88,10 @@ pub fn run() {
             terminal::term_write,
             terminal::term_resize,
             terminal::term_kill,
+            dap::free_port,
+            dap::dap_connect,
+            dap::dap_send,
+            dap::dap_close,
             lsp::lsp_start,
             lsp::lsp_send,
             lsp::lsp_stop,

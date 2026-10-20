@@ -15,6 +15,8 @@ pub struct ToolsStatus {
     /// Language server executable (basedpyright or pyright), if found.
     language_server: Option<String>,
     ruff: Option<String>,
+    /// debugpy package folder, run as `python <folder> --listen …` by any project interpreter.
+    debugpy: Option<String>,
     /// Where `tools_install` puts them.
     tools_dir: String,
 }
@@ -37,11 +39,19 @@ fn find(app: &AppHandle, names: &[&str]) -> Option<String> {
         .map(|p| util::slash(&p))
 }
 
+/// debugpy is installed as a pure-Python package outside the tools venv, so that
+/// the project's interpreter (whatever its version) can run it directly.
+fn debugpy_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(tools_dir(app)?.with_file_name("debugpy-lib"))
+}
+
 #[tauri::command(async)]
 pub fn tools_status(app: AppHandle) -> Result<ToolsStatus, String> {
+    let debugpy = debugpy_dir(&app)?.join("debugpy");
     Ok(ToolsStatus {
         language_server: find(&app, &["basedpyright-langserver", "pyright-langserver"]),
         ruff: find(&app, &["ruff"]),
+        debugpy: debugpy.join("__main__.py").is_file().then(|| util::slash(&debugpy)),
         tools_dir: util::slash(&tools_dir(&app)?),
     })
 }
@@ -91,7 +101,8 @@ fn run_logged(program: &Path, args: &[&str], log: &Channel<InstallEvent>) -> Res
     }
 }
 
-/// Creates the tools virtualenv with a system Python and installs basedpyright + Ruff.
+/// Creates the tools virtualenv with a system Python and installs basedpyright + Ruff,
+/// plus the pure-Python debugpy wheel for the debugger.
 #[tauri::command(async)]
 pub fn tools_install(app: AppHandle, on_event: Channel<InstallEvent>) -> Result<ToolsStatus, String> {
     let dir = tools_dir(&app)?;
@@ -106,6 +117,13 @@ pub fn tools_install(app: AppHandle, on_event: Channel<InstallEvent>) -> Result<
     }
     let mut args = vec!["-m", "pip", "install", "--upgrade"];
     args.extend(PACKAGES);
+    run_logged(&python, &args, &on_event)?;
+    let lib = debugpy_dir(&app)?;
+    let lib = lib.to_string_lossy();
+    let pure_wheel = ["--only-binary=:all:", "--platform", "any", "--implementation", "py", "--python-version", "3.9"];
+    let mut args = vec!["-m", "pip", "install", "--upgrade", "--no-deps", "--target", &lib];
+    args.extend(pure_wheel);
+    args.push("debugpy");
     run_logged(&python, &args, &on_event)?;
     tools_status(app)
 }
