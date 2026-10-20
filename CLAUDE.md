@@ -64,8 +64,9 @@ Tag a version on `main` (`git tag v0.3.0 && git push origin v0.3.0`). The releas
   - `main.js`: app shell, layout, shortcuts, project/interpreter handling
   - `editor.js`: tabs and CodeMirror setup; `intelligence.js`: LSP (basedpyright) and Ruff
   - `run.js`: Run tool window; `tests.js`: pytest results tree and gutter icons
+  - `debugger.js`: DAP client and Debug pane; `breakpoints.js`: breakpoint gutter and execution line
   - `terminal.js`: xterm.js terminal; `tree.js`: project tree; `platform.js`: per-OS keymaps and paths
-- `src-tauri/src/`: Rust backend (`fs_ops`, `runner`, `terminal`, `lsp`, `tools`, `util`)
+- `src-tauri/src/`: Rust backend (`fs_ops`, `runner`, `terminal`, `lsp`, `dap`, `tools`, `util`)
 - `src-tauri/helpers/pyrite_pytest.py`: pytest plugin, embedded in the binary
 - `examples/demo/`: small project for manual testing
 
