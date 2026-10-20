@@ -11,11 +11,9 @@ This file records how Pyrite was built, why it's built that way, and what's left
 | | |
 |---|---|
 | **Repo** | https://github.com/noa16-06/pyrite (private) |
-| **`main`** | v0.1, cross-platform support, code insight, test runner, CLAUDE.md, git hooks |
-| **Open PR #3** | `feature/debugger`: the debugger. All CI checks pass, but **it isn't merged yet** (waiting for the owner to try it) |
-| **This file** | arrives through its own `docs/` pull request |
-
-To merge the debugger from any machine: `gh pr merge 3 --squash --delete-branch`
+| **`main`** | v0.1, cross-platform support, code insight, test runner, CLAUDE.md, git hooks, debugger, this file |
+| **Open PRs** | none |
+| **Pull requests so far** | #1 CLAUDE.md · #2 git hooks · #3 debugger · #4 PROGRESS.md (all squash-merged) |
 
 ---
 
@@ -84,7 +82,7 @@ The brief: work out how PyCharm works (`/Applications/PyCharm.app`, 2026.1.4) an
 - `CLAUDE.md`: branches (`feature/`, `fix/`, `test/`, `docs/`, `refactor/`, `ci/`, `chore/`), Conventional Commits, PRs that must pass CI, squash merges, **ask before merging**
 - GitHub branch protection isn't possible (private repo on the free plan → HTTP 403 "Upgrade to GitHub Pro"), so `.githooks/pre-commit` and `.githooks/pre-push` block commits and pushes to `main` locally. `npm install` enables them.
 
-### Debugger (PR #3, `feature/debugger`, not merged yet)
+### Debugger (PR #3)
 - **debugpy** over DAP. `python -Xfrozen_modules=off <debugpy> --listen 127.0.0.1:PORT --wait-for-client file.py` runs in the Run window, so output and `input()` keep working, and Pyrite connects over TCP (`dap.rs`).
 - debugpy's **pure-Python wheel** is installed into `…/dev.pyrite.ide/debugpy-lib`, so any project interpreter can run it.
 - Breakpoint gutter: click left of the line numbers or press ⌘F8 / Ctrl+F8. Breakpoints move with edits and are saved per project.
@@ -112,7 +110,7 @@ These run in CI only as "it builds and the unit tests pass". Nobody has used the
 - [ ] Run: output, stdin, traceback links
 - [ ] Code insight: the **Install** banner button really installs basedpyright + Ruff + debugpy (never tested in the real app on any OS)
 - [ ] Test runner with a real project
-- [ ] Debugger (after merging PR #3): breakpoints, stepping, variables
+- [ ] Debugger: installing debugpy, breakpoints, stepping, variables
 - [ ] Linux shortcuts (Ctrl+Shift+N, Ctrl+G, Shift+F10, Alt+F12, …), and that none clash with GNOME
 - [ ] File dialogs (Open Folder, select interpreter)
 - [ ] Moving to the trash (`trash` crate) on Linux
@@ -123,7 +121,7 @@ These run in CI only as "it builds and the unit tests pass". Nobody has used the
 ## 6. To do (roadmap)
 
 **Next up**
-1. **Merge PR #3** (debugger) after trying it.
+1. **Check everything in section 5 on Fedora** and fix what's broken (`fix/…` branches).
 2. **Virtual environments and packages** (#6 in the original list): create a `.venv` from Pyrite, a packages tool window (list/install/update/remove with pip or uv). This also solves "pip is blocked by the system Python" when installing pytest.
 3. **Quick fixes (⌥⏎ / Alt+Enter)** from basedpyright and Ruff code actions (add import, remove unused, …).
 
