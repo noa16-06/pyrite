@@ -79,6 +79,7 @@ pub fn run() {
             runner::detect_interpreter,
             runner::interpreter_info,
             runner::run_python,
+            runner::run_tests,
             runner::stop_run,
             runner::send_stdin,
             terminal::term_spawn,

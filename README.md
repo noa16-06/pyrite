@@ -11,6 +11,7 @@ A fast, lightweight Python IDE inspired by PyCharm, built with Tauri 2 (Rust cor
 - **Interpreter:** auto-detects `.venv`/`venv`/`env`, or you pick one from the status bar
 - **Code insight** ([basedpyright](https://docs.basedpyright.com)): completion, hover docs, parameter info, go to declaration (also ⌘/Ctrl-click), find usages, rename, and type errors as you type
 - **Inspections and formatting** ([Ruff](https://docs.astral.sh/ruff)): lint warnings, Reformat Code, Optimize Imports, and PyCharm's error/warning counter in the editor corner
+- **Test runner (pytest):** green ▶ icons next to every `def test_…` and `class Test…`, a results tree (file → class → parametrized cases) with durations, the selected test's output and traceback, Rerun Failed, a Show Passed toggle, and gutter icons that show each test's last result. Test files (`test_*.py` / `*_test.py`) run with pytest from the Run button, and folders from the project tree's context menu. If pytest is missing, Pyrite offers to install it.
 - **Go to File**, **Go to Line**, and recent projects
 
 Code insight needs basedpyright and Ruff. When they're missing, Pyrite offers to install them into its own environment in the app data folder, so your project's environment isn't touched. Versions you already have on PATH (`basedpyright-langserver` or `pyright-langserver`, `ruff`) work too. Ruff uses your project's `pyproject.toml` / `ruff.toml` settings.
@@ -71,5 +72,4 @@ The **Release** workflow builds installers for macOS, Windows and Linux and atta
 
 - Quick fixes (⌥⏎ / Alt+Enter) from Ruff and basedpyright
 - Debugger (debugpy): breakpoints, stepping, variables
-- pytest runner with a results tree
 - Create venvs and manage pip packages

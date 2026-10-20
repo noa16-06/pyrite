@@ -11,6 +11,7 @@ import { ProjectTree } from "./tree.js";
 import { RunPanel } from "./run.js";
 import { TerminalPanel } from "./terminal.js";
 import { Intelligence } from "./intelligence.js";
+import { TestResults, isTestFile, testGutter, refreshTestGutter } from "./tests.js";
 
 const $ = (sel) => document.querySelector(sel);
 const appWindow = getCurrentWindow();
@@ -70,7 +71,8 @@ const editor = new EditorArea({
   emptyEl: $("#editor-empty"),
   onActiveChange(path) {
     $("#sb-path").textContent = path && state.root ? path.replace(state.root, basename(state.root)).split("/").join(" › ") : "";
-    $("#run-target-name").textContent = path && /\.py$/.test(path) ? basename(path) : "Current File";
+    $("#run-target-name").textContent =
+      path && isTestFile(path) ? `pytest in ${basename(path)}` : path && /\.py$/.test(path) ? basename(path) : "Current File";
     if (path) tree.select(path);
     saveSession();
   },
@@ -87,8 +89,13 @@ const intel = new Intelligence({
   problemsEl: $("#inspections"),
   bannerEl: $("#tools-banner"),
 });
+const testResults = new TestResults();
+testResults.onChange = () => editor.active && isTestFile(editor.active) && refreshTestGutter(editor.view);
 editor.hooks = {
-  extension: (path) => intel.extension(path),
+  extension: (path) => [
+    intel.extension(path),
+    isTestFile(path) ? testGutter(path, { results: testResults, run: (target, name) => runTests([target], name) }) : [],
+  ],
   beforeSwitch: () => intel.sync(),
   activated: (path) => intel.activated(path),
   changed: (path) => intel.changed(path),
@@ -107,7 +114,13 @@ const tree = new ProjectTree($("#tree"), {
       { label: "New Directory", icon: icons.folder, action: () => newDir(dir) },
       "-",
     ];
-    if (!isDir && /\.py$/.test(path)) items.push({ label: `Run '${basename(path)}'`, icon: icons.run, action: () => runFile(path) }, "-");
+    if (!isDir && isTestFile(path)) {
+      items.push({ label: `Run 'pytest in ${basename(path)}'`, icon: icons.run, action: () => runTests([path], basename(path)) }, "-");
+    } else if (!isDir && /\.py$/.test(path)) {
+      items.push({ label: `Run '${basename(path)}'`, icon: icons.run, action: () => runFile(path) }, "-");
+    } else if (isDir) {
+      items.push({ label: `Run 'pytest in ${basename(path)}'`, icon: icons.run, action: () => runTests([path], basename(path)) });
+    }
     if (isDir) items.push({ label: "Open in Terminal", icon: icons.terminal, action: () => openTerminalAt(path) });
     if (path !== state.root) {
       items.push({ label: "Rename…", action: () => renamePath(path) });
@@ -119,6 +132,8 @@ const tree = new ProjectTree($("#tree"), {
 });
 
 const runPanel = new RunPanel($("#run-view"), {
+  results: testResults,
+  onContextMenu: (x, y, items) => contextMenu(x, y, items),
   onOpenLocation: (file, line) => openFile(normalizePath(file), line),
   onStateChange(running) {
     state.running = running;
@@ -462,9 +477,22 @@ async function runFile(file) {
     toast("No Python interpreter configured — click the interpreter in the status bar.", "error");
     return;
   }
+  if (isTestFile(file)) return runTests([file], basename(file)); // PyCharm runs test files with pytest
   await editor.saveAll(); // PyCharm saves everything before running
   showBottom("run", false);
-  runPanel.run({ interpreter: state.interpreter.path, file, cwd: dirname(file) });
+  runPanel.run({ kind: "script", interpreter: state.interpreter.path, file, cwd: dirname(file) });
+}
+
+/** Runs pytest from the project root on files, folders or `file::Class::test` targets. */
+async function runTests(targets, title) {
+  if (!state.root) return;
+  if (!state.interpreter) {
+    toast("No Python interpreter configured — click the interpreter in the status bar.", "error");
+    return;
+  }
+  await editor.saveAll();
+  showBottom("run", false);
+  runPanel.run({ kind: "tests", interpreter: state.interpreter.path, targets, cwd: state.root, title });
 }
 
 function runCurrent() {
@@ -677,7 +705,7 @@ $("#editor").addEventListener("contextmenu", (e) => {
     item("Reformat Code", "reformat"),
     item("Optimize Imports", "optimizeImports"),
     "-",
-    item(`Run '${basename(editor.active)}'`, "runFile", icons.run),
+    item(isTestFile(editor.active) ? `Run 'pytest in ${basename(editor.active)}'` : `Run '${basename(editor.active)}'`, "runFile", icons.run),
   ]);
 });
 

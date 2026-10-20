@@ -1,13 +1,15 @@
 use crate::util::{self, Utf8Stream};
 use serde::Serialize;
-use std::io::{Read, Write};
+use std::fs::File;
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ExitStatus, Stdio};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use tauri::ipc::Channel;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 
 #[derive(Default)]
 pub struct RunState {
@@ -122,27 +124,60 @@ fn kill_current(state: &RunState) {
     state.stdin.lock().unwrap().take();
 }
 
-#[tauri::command]
-pub fn run_python(
-    interpreter: String,
-    script: String,
-    cwd: String,
-    on_event: Channel<RunEvent>,
-    state: State<'_, RunState>,
-) -> Result<(), String> {
-    kill_current(&state);
+/// Follows the pytest plugin's JSON-lines report while the tests run.
+fn tail_report(path: PathBuf, ch: Channel<String>, done: Arc<AtomicBool>) -> thread::JoinHandle<()> {
+    thread::spawn(move || {
+        let Ok(file) = File::open(&path) else { return };
+        let mut reader = BufReader::new(file);
+        let mut line = String::new();
+        loop {
+            match reader.read_line(&mut line) {
+                Ok(0) | Err(_) => {
+                    // Check `done` before the final read, so nothing written at exit is missed.
+                    if done.load(Ordering::Acquire) && reader.read_line(&mut line).map_or(true, |n| n == 0) {
+                        break;
+                    }
+                    thread::sleep(Duration::from_millis(30));
+                }
+                Ok(_) => {}
+            }
+            if line.ends_with('\n') {
+                if ch.send(line.trim_end().to_string()).is_err() {
+                    break;
+                }
+                line.clear();
+            }
+        }
+        let _ = std::fs::remove_file(&path);
+    })
+}
 
-    let mut cmd = util::command(&interpreter);
-    cmd.arg("-u")
-        .arg(&script)
-        .current_dir(&cwd)
+/// Runs `interpreter args…` in the Run tool window: output streams to `on_event`,
+/// and an optional test report is followed until the process exits.
+fn spawn_run(
+    interpreter: &str,
+    args: &[String],
+    cwd: &str,
+    env: &[(&str, String)],
+    report: Option<(PathBuf, Channel<String>)>,
+    on_event: Channel<RunEvent>,
+    state: &RunState,
+) -> Result<(), String> {
+    kill_current(state);
+
+    let mut cmd = util::command(interpreter);
+    cmd.args(args)
+        .current_dir(cwd)
         .env("PATH", util::user_path())
         .env("PYTHONUNBUFFERED", "1")
         .env("PYTHONIOENCODING", "utf-8")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    if let Some(venv) = venv_root(Path::new(&interpreter)) {
+    for (key, value) in env {
+        cmd.env(key, value);
+    }
+    if let Some(venv) = venv_root(Path::new(interpreter)) {
         cmd.env("VIRTUAL_ENV", venv);
     }
 
@@ -156,6 +191,8 @@ pub fn run_python(
 
     let out_thread = pump(stdout, on_event.clone(), false);
     let err_thread = pump(stderr, on_event.clone(), true);
+    let done = Arc::new(AtomicBool::new(false));
+    let tail_thread = report.map(|(path, ch)| tail_report(path, ch, done.clone()));
 
     thread::spawn(move || {
         // Drain all output before announcing the exit so it always comes last.
@@ -169,9 +206,64 @@ pub fn run_python(
             }
             thread::sleep(Duration::from_millis(20));
         };
+        done.store(true, Ordering::Release);
+        if let Some(t) = tail_thread {
+            let _ = t.join();
+        }
         let _ = on_event.send(RunEvent::Exit { code });
     });
     Ok(())
+}
+
+/// Runs a Python file (`["-u", script]`) or any interpreter arguments, e.g. `-m pip install pytest`.
+#[tauri::command]
+pub fn run_python(
+    interpreter: String,
+    args: Vec<String>,
+    cwd: String,
+    on_event: Channel<RunEvent>,
+    state: State<'_, RunState>,
+) -> Result<(), String> {
+    spawn_run(&interpreter, &args, &cwd, &[], None, on_event, &state)
+}
+
+const PYTEST_PLUGIN: &str = include_str!("../helpers/pyrite_pytest.py");
+
+/// Runs pytest on `targets` (files, folders or node ids) with Pyrite's reporting plugin.
+/// Test events arrive on `on_test` as JSON strings; console output on `on_event`.
+#[tauri::command]
+pub fn run_tests(
+    app: AppHandle,
+    interpreter: String,
+    targets: Vec<String>,
+    cwd: String,
+    on_event: Channel<RunEvent>,
+    on_test: Channel<String>,
+    state: State<'_, RunState>,
+) -> Result<(), String> {
+    let helpers = app.path().app_data_dir().map_err(|e| e.to_string())?.join("helpers");
+    std::fs::create_dir_all(&helpers).map_err(|e| e.to_string())?;
+    std::fs::write(helpers.join("pyrite_pytest.py"), PYTEST_PLUGIN).map_err(|e| e.to_string())?;
+
+    static RUNS: AtomicU32 = AtomicU32::new(0);
+    let report = std::env::temp_dir().join(format!(
+        "pyrite-tests-{}-{}.jsonl",
+        std::process::id(),
+        RUNS.fetch_add(1, Ordering::Relaxed)
+    ));
+    File::create(&report).map_err(|e| e.to_string())?;
+
+    let python_path = std::env::join_paths(
+        std::iter::once(helpers).chain(std::env::var_os("PYTHONPATH").iter().flat_map(std::env::split_paths)),
+    )
+    .map_err(|e| e.to_string())?;
+    let env = [
+        ("PYTHONPATH", python_path.to_string_lossy().into_owned()),
+        ("PYRITE_TEST_REPORT", report.to_string_lossy().into_owned()),
+    ];
+    let mut args: Vec<String> = ["-m", "pytest", "-p", "pyrite_pytest"].map(String::from).to_vec();
+    args.extend(targets);
+    spawn_run(&interpreter, &args, &cwd, &env, Some((report, on_test)), on_event, &state)
 }
 
 #[tauri::command]
@@ -184,4 +276,38 @@ pub fn send_stdin(data: String, state: State<'_, RunState>) -> Result<(), String
     let mut stdin = state.stdin.lock().unwrap();
     let pipe = stdin.as_mut().ok_or("Process is not running")?;
     pipe.write_all(data.as_bytes()).and_then(|_| pipe.flush()).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tauri::ipc::InvokeResponseBody;
+
+    #[test]
+    fn tail_report_delivers_lines_written_until_exit() {
+        let path = std::env::temp_dir().join(format!("pyrite-tail-test-{}.jsonl", std::process::id()));
+        std::fs::write(&path, "").unwrap();
+        let got = Arc::new(Mutex::new(Vec::<String>::new()));
+        let sink = got.clone();
+        let ch = Channel::new(move |body| {
+            if let InvokeResponseBody::Json(json) = body {
+                sink.lock().unwrap().push(serde_json::from_str(&json).unwrap());
+            }
+            Ok(())
+        });
+        let done = Arc::new(AtomicBool::new(false));
+        let tail = tail_report(path.clone(), ch, done.clone());
+
+        let mut f = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
+        f.write_all(b"{\"a\":1}\n{\"b\":").unwrap(); // second line still being written
+        f.flush().unwrap();
+        thread::sleep(Duration::from_millis(100));
+        f.write_all(b"2}\n{\"c\":3}\n").unwrap();
+        f.flush().unwrap();
+        done.store(true, Ordering::Release); // the process exited right after writing
+        tail.join().unwrap();
+
+        assert_eq!(*got.lock().unwrap(), ["{\"a\":1}", "{\"b\":2}", "{\"c\":3}"]);
+        assert!(!path.exists(), "report file is cleaned up");
+    }
 }

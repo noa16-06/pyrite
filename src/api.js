@@ -14,7 +14,8 @@ export const api = {
 
   detectInterpreter: (root) => invoke("detect_interpreter", { root }),
   interpreterInfo: (path) => invoke("interpreter_info", { path }),
-  runPython: (interpreter, script, cwd, onEvent) => invoke("run_python", { interpreter, script, cwd, onEvent }),
+  runPython: (interpreter, args, cwd, onEvent) => invoke("run_python", { interpreter, args, cwd, onEvent }),
+  runTests: (interpreter, targets, cwd, onEvent, onTest) => invoke("run_tests", { interpreter, targets, cwd, onEvent, onTest }),
   stopRun: () => invoke("stop_run"),
   sendStdin: (data) => invoke("send_stdin", { data }),
 
