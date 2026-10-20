@@ -27,6 +27,13 @@ const KEYMAP = {
     optimizeImports: "Ctrl+Alt+O",
     nextProblem: "F2",
     prevProblem: "Shift+F2",
+    debugFile: "Ctrl+D",
+    resume: "Meta+Alt+R",
+    stepOver: "F8",
+    stepInto: "F7",
+    stepOut: "Shift+F8",
+    toggleBreakpoint: "Meta+F8",
+    evaluate: "Alt+F8",
   },
   other: {
     saveAll: "Ctrl+S",
@@ -49,6 +56,13 @@ const KEYMAP = {
     optimizeImports: "Ctrl+Alt+O",
     nextProblem: "F2",
     prevProblem: "Shift+F2",
+    debugFile: "Shift+F9",
+    resume: "F9",
+    stepOver: "F8",
+    stepInto: "F7",
+    stepOut: "Shift+F8",
+    toggleBreakpoint: "Ctrl+F8",
+    evaluate: "Alt+F8",
   },
 };
 

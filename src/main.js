@@ -12,6 +12,8 @@ import { RunPanel } from "./run.js";
 import { TerminalPanel } from "./terminal.js";
 import { Intelligence } from "./intelligence.js";
 import { TestResults, isTestFile, testGutter, refreshTestGutter } from "./tests.js";
+import { Breakpoints, breakpointGutter, refreshBreakpoints } from "./breakpoints.js";
+import { Debugger } from "./debugger.js";
 
 const $ = (sel) => document.querySelector(sel);
 const appWindow = getCurrentWindow();
@@ -45,6 +47,7 @@ const state = {
 // ---------------------------------------------------------------- icons
 for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = icons[el.dataset.icon];
 $("#btn-run").innerHTML = icons.run;
+$("#btn-debug").innerHTML = icons.debug;
 $("#btn-stop").innerHTML = icons.stop;
 $("#btn-search").innerHTML = icons.search;
 $('.stripe-btn[data-panel="project"]').innerHTML = icons.project;
@@ -90,11 +93,13 @@ const intel = new Intelligence({
   bannerEl: $("#tools-banner"),
 });
 const testResults = new TestResults();
+const breakpoints = new Breakpoints();
 testResults.onChange = () => editor.active && isTestFile(editor.active) && refreshTestGutter(editor.view);
 editor.hooks = {
   extension: (path) => [
     intel.extension(path),
     isTestFile(path) ? testGutter(path, { results: testResults, run: (target, name) => runTests([target], name) }) : [],
+    /\.pyw?$/.test(path) ? breakpointGutter(path, breakpoints) : [],
   ],
   beforeSwitch: () => intel.sync(),
   activated: (path) => intel.activated(path),
@@ -117,7 +122,11 @@ const tree = new ProjectTree($("#tree"), {
     if (!isDir && isTestFile(path)) {
       items.push({ label: `Run 'pytest in ${basename(path)}'`, icon: icons.run, action: () => runTests([path], basename(path)) }, "-");
     } else if (!isDir && /\.py$/.test(path)) {
-      items.push({ label: `Run '${basename(path)}'`, icon: icons.run, action: () => runFile(path) }, "-");
+      items.push(
+        { label: `Run '${basename(path)}'`, icon: icons.run, action: () => runFile(path) },
+        { label: `Debug '${basename(path)}'`, icon: icons.debug, action: () => debugFile(path) },
+        "-"
+      );
     } else if (isDir) {
       items.push({ label: `Run 'pytest in ${basename(path)}'`, icon: icons.run, action: () => runTests([path], basename(path)) });
     }
@@ -140,7 +149,21 @@ const runPanel = new RunPanel($("#run-view"), {
     $("#btn-stop").disabled = !running;
     $("#run-widget").classList.toggle("running", running);
   },
+  onModeChange(kind) {
+    $('.tool-tab[data-view="run"]').textContent = kind === "debug" ? "Debug" : "Run";
+  },
 });
+
+const debug = new Debugger(runPanel.debugPane, {
+  breakpoints,
+  openFile: (path, line) => openFile(path, line),
+  refreshEditor: () => editor.active && refreshBreakpoints(editor.view),
+});
+runPanel.debugger = debug;
+breakpoints.onChange = (path) => {
+  if (state.root) store.set("project." + state.root, { ...store.get("project." + state.root, {}), breakpoints: breakpoints.toJSON() });
+  debug.sendBreakpoints(path);
+};
 
 let terminalCwd = null;
 const terminals = new TerminalPanel($("#terminal-view"), {
@@ -266,6 +289,7 @@ async function openProject(root) {
 
   await tree.load(root);
   const session = store.get("project." + root, {});
+  breakpoints.load(session.breakpoints);
   await loadInterpreter(session.interpreter);
   for (const f of session.tabs ?? []) await editor.open(f).catch(() => {});
   if (session.active && editor.has(session.active)) editor.activate(session.active);
@@ -280,6 +304,8 @@ async function closeProject(showWelcome = true) {
   $("#sb-lsp").textContent = "";
   await runPanel.stop();
   runPanel.clear();
+  debug.end();
+  breakpoints.load({});
   terminals.closeAll();
   state.root = null;
   state.interpreter = null;
@@ -442,6 +468,8 @@ async function renamePath(path) {
     const moved = editor.order.filter((p) => p === path || p.startsWith(path + "/"));
     editor.renamed(path, to);
     intel.renamed(moved);
+    breakpoints.renamed(path, to);
+    breakpoints.onChange?.(to);
     await tree.refresh();
     tree.select(to);
   } catch (err) {
@@ -500,6 +528,49 @@ function runCurrent() {
 }
 
 $("#btn-run").addEventListener("click", runCurrent);
+$("#btn-debug").addEventListener("click", () => debugFile(editor.active));
+
+/** Debugs a file with debugpy; test files run pytest under the debugger. */
+async function debugFile(file) {
+  if (!state.root) return;
+  if (!file || !/\.pyw?$/.test(file)) {
+    toast("Open a Python file to debug it.", "info");
+    return;
+  }
+  if (!state.interpreter) {
+    toast("No Python interpreter configured — click the interpreter in the status bar.", "error");
+    return;
+  }
+  if (!intel.tools?.debugpy) {
+    const ok = await ask("The debugger needs debugpy. Install Pyrite's code tools (basedpyright, Ruff and debugpy) now?", {
+      title: "Debugger",
+      okLabel: "Install",
+      cancelLabel: "Cancel",
+    });
+    if (!ok) return;
+    await intel.install();
+    if (!intel.tools?.debugpy) return;
+  }
+  await editor.saveAll();
+  showBottom("run", false);
+  const test = isTestFile(file);
+  runPanel.run({
+    kind: "debug",
+    interpreter: state.interpreter.path,
+    file,
+    cwd: test ? state.root : dirname(file),
+    debugpy: intel.tools.debugpy,
+    program: test ? ["-m", "pytest", file] : undefined,
+  });
+}
+
+function toggleBreakpoint() {
+  const path = editor.active;
+  if (!path || !/\.pyw?$/.test(path)) return;
+  const view = editor.view;
+  breakpoints.toggle(path, view.state.doc.lineAt(view.state.selection.main.head).number);
+  refreshBreakpoints(view);
+}
 $("#btn-stop").addEventListener("click", () => runPanel.stop());
 
 function openTerminalAt(dir) {
@@ -706,6 +777,8 @@ $("#editor").addEventListener("contextmenu", (e) => {
     item("Optimize Imports", "optimizeImports"),
     "-",
     item(isTestFile(editor.active) ? `Run 'pytest in ${basename(editor.active)}'` : `Run '${basename(editor.active)}'`, "runFile", icons.run),
+    item(`Debug '${basename(editor.active)}'`, "debugFile", icons.debug),
+    item("Toggle Line Breakpoint", "toggleBreakpoint"),
   ]);
 });
 
@@ -731,12 +804,22 @@ const actions = {
   optimizeImports: () => intel.optimizeImports(),
   nextProblem: () => intel.nextProblem(),
   prevProblem: () => intel.nextProblem(true),
+  debugFile: () => debugFile(editor.active),
+  resume: () => debug.resume(),
+  stepOver: () => debug.stepOver(),
+  stepInto: () => debug.stepInto(),
+  stepOut: () => debug.stepOut(),
+  toggleBreakpoint: () => toggleBreakpoint(),
+  evaluate: () => (showBottom("run", false), debug.focusEvaluate()),
 };
+// Stepping keys only do something while a debug session is paused; otherwise they stay free.
+const WHILE_PAUSED = new Set(["resume", "stepOver", "stepInto", "stepOut", "evaluate"]);
 // Inside the terminal these keys belong to the shell (⌘L/Ctrl+G, ⌘W/Ctrl+F4 are fine elsewhere).
 const NOT_IN_TERMINAL = new Set(["goToLine", "closeTab"]);
 // Code actions work on the symbol at the cursor, so they need the editor to have focus.
 const CODE_ACTIONS = new Set([
   "goToDeclaration", "findUsages", "rename", "parameterInfo", "reformat", "optimizeImports", "nextProblem", "prevProblem",
+  "toggleBreakpoint",
 ]);
 
 function cycleTab(step) {
@@ -761,7 +844,11 @@ window.addEventListener(
     if (!(inTerminal && e.ctrlKey && !e.shiftKey)) {
       const inEditor = !!e.target.closest?.("#editor");
       action = Object.keys(actions).find(
-        (a) => matches(e, keymap[a]) && !(inTerminal && NOT_IN_TERMINAL.has(a)) && (inEditor || !CODE_ACTIONS.has(a))
+        (a) =>
+          matches(e, keymap[a]) &&
+          !(inTerminal && NOT_IN_TERMINAL.has(a)) &&
+          (inEditor || !CODE_ACTIONS.has(a)) &&
+          (!WHILE_PAUSED.has(a) || debug.state === "paused")
       );
     }
     if (action) actions[action]();
@@ -791,4 +878,4 @@ renderWelcome();
 const [lastProject] = recentProjects();
 if (lastProject && store.get("reopenLast", true)) openProject(lastProject).catch(() => closeProject());
 
-if (import.meta.env.DEV) window.__pyrite = { editor, intel }; // for automated UI checks
+if (import.meta.env.DEV) window.__pyrite = { editor, intel, debug, breakpoints }; // for automated UI checks

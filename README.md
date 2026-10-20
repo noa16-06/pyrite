@@ -12,9 +12,10 @@ A fast, lightweight Python IDE inspired by PyCharm, built with Tauri 2 (Rust cor
 - **Code insight** ([basedpyright](https://docs.basedpyright.com)): completion, hover docs, parameter info, go to declaration (also ⌘/Ctrl-click), find usages, rename, and type errors as you type
 - **Inspections and formatting** ([Ruff](https://docs.astral.sh/ruff)): lint warnings, Reformat Code, Optimize Imports, and PyCharm's error/warning counter in the editor corner
 - **Test runner (pytest):** green ▶ icons next to every `def test_…` and `class Test…`, a results tree (file → class → parametrized cases) with durations, the selected test's output and traceback, Rerun Failed, a Show Passed toggle, and gutter icons that show each test's last result. Test files (`test_*.py` / `*_test.py`) run with pytest from the Run button, and folders from the project tree's context menu. If pytest is missing, Pyrite offers to install it.
+- **Debugger (debugpy):** click the gutter to set breakpoints (they move with your edits and are saved per project), Debug the current file (test files run pytest under the debugger), step over/into/out, pause and resume, frames and an expandable variables tree, Evaluate Expression, a stop on uncaught exceptions, and the execution line highlighted in the editor. The program's output and `input()` stay in the console.
 - **Go to File**, **Go to Line**, and recent projects
 
-Code insight needs basedpyright and Ruff. When they're missing, Pyrite offers to install them into its own environment in the app data folder, so your project's environment isn't touched. Versions you already have on PATH (`basedpyright-langserver` or `pyright-langserver`, `ruff`) work too. Ruff uses your project's `pyproject.toml` / `ruff.toml` settings.
+Code insight needs basedpyright and Ruff, and the debugger needs debugpy. When they're missing, Pyrite offers to install them into its own environment in the app data folder, so your project's environment isn't touched. Versions you already have on PATH (`basedpyright-langserver` or `pyright-langserver`, `ruff`) work too. Ruff uses your project's `pyproject.toml` / `ruff.toml` settings.
 
 ## Shortcuts
 
@@ -41,6 +42,11 @@ Pyrite uses PyCharm's default keymap for each OS.
 | Reformat Code | `⌥⌘L` | `Ctrl+Alt+L` |
 | Optimize Imports | `⌃⌥O` | `Ctrl+Alt+O` |
 | Next/previous problem | `F2` / `⇧F2` | `F2` / `Shift+F2` |
+| Debug current file | `⌃D` | `Shift+F9` |
+| Toggle line breakpoint | `⌘F8` | `Ctrl+F8` |
+| Resume program | `⌥⌘R` | `F9` |
+| Step over / into / out | `F8` / `F7` / `⇧F8` | `F8` / `F7` / `Shift+F8` |
+| Evaluate expression | `⌥F8` | `Alt+F8` |
 
 ## Development
 
@@ -73,5 +79,4 @@ The **Release** workflow builds installers for macOS, Windows and Linux and atta
 ## Roadmap
 
 - Quick fixes (⌥⏎ / Alt+Enter) from Ruff and basedpyright
-- Debugger (debugpy): breakpoints, stepping, variables
 - Create venvs and manage pip packages
