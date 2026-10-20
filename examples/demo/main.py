@@ -1,4 +1,4 @@
-"""Pyrite demo — press ⌃⇧R to run this file."""
+"""Pyrite demo — run this file with ⌃⇧R (macOS) or Ctrl+Shift+F10 (Windows/Linux)."""
 from dataclasses import dataclass
 
 

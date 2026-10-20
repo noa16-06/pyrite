@@ -1,3 +1,4 @@
+use crate::util;
 use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -33,7 +34,7 @@ pub fn list_dir(path: String) -> Result<Vec<Entry>, String> {
             let path = e.path();
             // fs::metadata follows symlinks, so linked folders behave like folders.
             let is_dir = fs::metadata(&path).map(|m| m.is_dir()).unwrap_or(false);
-            Some(Entry { name, path: path.to_string_lossy().into_owned(), is_dir })
+            Some(Entry { name, path: util::slash(&path), is_dir })
         })
         .collect();
     entries.sort_by(|a, b| {
@@ -113,7 +114,7 @@ pub fn list_files(root: String) -> Result<Vec<String>, String> {
             if ft.is_dir() {
                 stack.push(path);
             } else if let Ok(rel) = path.strip_prefix(&root) {
-                out.push(rel.to_string_lossy().into_owned());
+                out.push(util::slash(rel));
                 if out.len() >= MAX_INDEXED_FILES {
                     return Ok(out);
                 }

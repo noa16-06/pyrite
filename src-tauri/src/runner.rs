@@ -2,7 +2,7 @@ use crate::util::{self, Utf8Stream};
 use serde::Serialize;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, Command, ExitStatus, Stdio};
+use std::process::{Child, ChildStdin, ExitStatus, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -32,13 +32,13 @@ pub struct InterpreterInfo {
 }
 
 fn venv_root(python: &Path) -> Option<PathBuf> {
-    // <venv>/bin/python  →  <venv>/pyvenv.cfg
+    // <venv>/bin/python (Scripts\python.exe on Windows)  →  <venv>/pyvenv.cfg
     let root = python.parent()?.parent()?;
     root.join("pyvenv.cfg").is_file().then(|| root.to_path_buf())
 }
 
 fn describe(python: &Path) -> Result<InterpreterInfo, String> {
-    let out = Command::new(python)
+    let out = util::command(python)
         .arg("--version")
         .stdin(Stdio::null())
         .output()
@@ -46,9 +46,9 @@ fn describe(python: &Path) -> Result<InterpreterInfo, String> {
     let text = if out.stdout.is_empty() { out.stderr } else { out.stdout };
     let version = String::from_utf8_lossy(&text).trim().trim_start_matches("Python ").to_string();
     Ok(InterpreterInfo {
-        path: python.to_string_lossy().into_owned(),
+        path: util::slash(python),
         version,
-        venv: venv_root(python).map(|p| p.to_string_lossy().into_owned()),
+        venv: venv_root(python).map(|p| util::slash(&p)),
     })
 }
 
@@ -58,20 +58,30 @@ fn describe(python: &Path) -> Result<InterpreterInfo, String> {
 pub fn detect_interpreter(root: String) -> Result<InterpreterInfo, String> {
     let root = Path::new(&root);
     for venv in [".venv", "venv", "env", ".env"] {
-        let candidate = root.join(venv).join("bin").join("python");
+        let candidate = util::venv_python(&root.join(venv));
         if candidate.is_file() {
             return describe(&candidate);
         }
     }
     let system = util::which("python3")
         .or_else(|| util::which("python"))
+        .or_else(|| util::which("py"))
         .ok_or("No Python interpreter found on PATH")?;
     describe(&system)
 }
 
+/// `path` may be a Python executable or a virtualenv folder.
 #[tauri::command(async)]
 pub fn interpreter_info(path: String) -> Result<InterpreterInfo, String> {
-    describe(Path::new(&path))
+    let path = Path::new(&path);
+    if path.is_dir() {
+        let python = util::venv_python(path);
+        if !python.is_file() {
+            return Err(format!("{} is not a virtual environment", path.display()));
+        }
+        return describe(&python);
+    }
+    describe(path)
 }
 
 fn exit_code(status: ExitStatus) -> i32 {
@@ -122,7 +132,7 @@ pub fn run_python(
 ) -> Result<(), String> {
     kill_current(&state);
 
-    let mut cmd = Command::new(&interpreter);
+    let mut cmd = util::command(&interpreter);
     cmd.arg("-u")
         .arg(&script)
         .current_dir(&cwd)

@@ -61,6 +61,8 @@ svg { display: block; }
   border-bottom: 1px solid var(--border);
 }
 .traffic-space { width: 72px; height: 100%; flex: none; }
+/* Only macOS draws window buttons over the toolbar; elsewhere the native frame stays. */
+:root:not([data-os="mac"]) .traffic-space { width: 0; }
 .spacer { flex: 1; height: 100%; }
 
 .tb-widget {

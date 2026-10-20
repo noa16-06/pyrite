@@ -1,4 +1,5 @@
 import { api, basename } from "./api.js";
+import { tildify } from "./platform.js";
 import { fileIcon, folderIcon, icons } from "./icons.js";
 
 const INDENT = 16;
@@ -75,7 +76,7 @@ export class ProjectTree {
     if (isRoot) {
       const hint = document.createElement("span");
       hint.className = "hint";
-      hint.textContent = entry.path.replace(/^\/Users\/[^/]+/, "~");
+      hint.textContent = tildify(entry.path);
       el.append(hint);
     }
     if (entry.is_dir && /^(\.?venv|env|node_modules|build|dist|\.tox|target)$/.test(entry.name)) {

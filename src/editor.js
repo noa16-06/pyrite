@@ -17,6 +17,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { tags as t } from "@lezer/highlight";
 import { api, basename } from "./api.js";
 import { fileIcon, icons } from "./icons.js";
+import { editorKeys } from "./platform.js";
 
 // Colors follow PyCharm's "Dark" (New UI) scheme.
 const highlight = HighlightStyle.define([
@@ -67,11 +68,11 @@ const theme = EditorView.theme(
   { dark: true }
 );
 
-// PyCharm (macOS keymap) shortcuts layered over CodeMirror's defaults.
+// PyCharm shortcuts layered over CodeMirror's defaults ("Mod" is ⌘ on macOS, Ctrl elsewhere).
 const pycharmKeymap = [
   { key: "Mod-d", run: copyLineDown, preventDefault: true },
-  { key: "Mod-Backspace", run: deleteLine },
-  { key: "Ctrl-g", run: selectNextOccurrence, preventDefault: true },
+  { key: editorKeys.deleteLine, run: deleteLine, preventDefault: true },
+  { key: editorKeys.selectNextOccurrence, run: selectNextOccurrence, preventDefault: true },
   { key: "Alt-Shift-ArrowUp", run: moveLineUp },
   { key: "Alt-Shift-ArrowDown", run: moveLineDown },
 ];

@@ -20,20 +20,20 @@
             <span class="icon" data-icon="python"></span>
             <span id="run-target-name">Current File</span>
           </div>
-          <button class="tb-icon run" id="btn-run" title="Run current file  ⌃⇧R"></button>
-          <button class="tb-icon stop" id="btn-stop" title="Stop  ⌘F2" disabled></button>
+          <button class="tb-icon run" id="btn-run" title="Run current file" data-key="runFile"></button>
+          <button class="tb-icon stop" id="btn-stop" title="Stop" data-key="stop" disabled></button>
         </div>
-        <button class="tb-icon" id="btn-search" title="Go to File  ⇧⇧ / ⌘⇧O"></button>
+        <button class="tb-icon" id="btn-search" title="Go to File" data-key="goToFile"></button>
       </header>
 
       <div id="main">
         <nav id="stripe">
           <div class="stripe-group">
-            <button class="stripe-btn" data-panel="project" title="Project  ⌘1"></button>
+            <button class="stripe-btn" data-panel="project" title="Project" data-key="project"></button>
           </div>
           <div class="stripe-group">
-            <button class="stripe-btn" data-panel="run" title="Run  ⌘4"></button>
-            <button class="stripe-btn" data-panel="terminal" title="Terminal  ⌥F12"></button>
+            <button class="stripe-btn" data-panel="run" title="Run" data-key="runTool"></button>
+            <button class="stripe-btn" data-panel="terminal" title="Terminal" data-key="terminal"></button>
           </div>
         </nav>
 
@@ -57,11 +57,11 @@
               <div id="editor"></div>
               <div id="editor-empty">
                 <div class="hints">
-                  <div><span>Go to File</span><kbd>⇧⇧</kbd></div>
-                  <div><span>Run Current File</span><kbd>⌃⇧R</kbd></div>
-                  <div><span>Terminal</span><kbd>⌥F12</kbd></div>
-                  <div><span>Project View</span><kbd>⌘1</kbd></div>
-                  <div><span>Go to Line</span><kbd>⌘L</kbd></div>
+                  <div><span>Go to File</span><kbd data-key="doubleShift"></kbd></div>
+                  <div><span>Run Current File</span><kbd data-key="runFile"></kbd></div>
+                  <div><span>Terminal</span><kbd data-key="terminal"></kbd></div>
+                  <div><span>Project View</span><kbd data-key="project"></kbd></div>
+                  <div><span>Go to Line</span><kbd data-key="goToLine"></kbd></div>
                 </div>
               </div>
             </section>

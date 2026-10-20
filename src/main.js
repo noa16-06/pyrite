@@ -4,6 +4,7 @@ import "./styles.css";
 import { open as openDialog, ask } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { api, basename, dirname, join } from "./api.js";
+import { keymap, matches, label, doubleShiftLabel, tildify, normalizePath } from "./platform.js";
 import { icons, logo } from "./icons.js";
 import { EditorArea } from "./editor.js";
 import { ProjectTree } from "./tree.js";
@@ -53,6 +54,12 @@ $("#tree-refresh").innerHTML = icons.refresh;
 $("#tree-collapse").innerHTML = icons.collapse;
 $("#bottom-hide").innerHTML = icons.minimize;
 $("#welcome-logo").innerHTML = logo(56);
+for (const el of document.querySelectorAll("[data-key]")) {
+  const text = el.dataset.key === "doubleShift" ? doubleShiftLabel : label(keymap[el.dataset.key]);
+  if (el.tagName === "KBD") el.textContent = text;
+  else el.title += `  ${text}`;
+}
+$("#btn-search").title += ` / ${doubleShiftLabel}`;
 
 // ---------------------------------------------------------------- components
 const editor = new EditorArea({
@@ -92,7 +99,7 @@ const tree = new ProjectTree($("#tree"), {
 });
 
 const runPanel = new RunPanel($("#run-view"), {
-  onOpenLocation: (file, line) => openFile(file, line),
+  onOpenLocation: (file, line) => openFile(normalizePath(file), line),
   onStateChange(running) {
     state.running = running;
     $("#btn-stop").disabled = !running;
@@ -183,7 +190,7 @@ function renderWelcome() {
       li.innerHTML = `<span class="proj-badge"></span><div class="recent-text"><div class="recent-name"></div><div class="recent-path"></div></div><button class="icon-btn remove" title="Remove from list">${icons.close}</button>`;
       li.querySelector(".proj-badge").textContent = badge(basename(path));
       li.querySelector(".recent-name").textContent = basename(path);
-      li.querySelector(".recent-path").textContent = path.replace(/^\/Users\/[^/]+/, "~");
+      li.querySelector(".recent-path").textContent = tildify(path);
       li.addEventListener("click", (e) => {
         if (e.target.closest(".remove")) {
           store.set("recent", recentProjects().filter((p) => p !== path));
@@ -208,7 +215,7 @@ function badge(name) {
 
 async function chooseProject() {
   const dir = await openDialog({ directory: true, multiple: false, title: "Open Project Folder" });
-  if (dir) await openProject(dir);
+  if (dir) await openProject(normalizePath(dir));
 }
 
 async function openProject(root) {
@@ -266,7 +273,7 @@ $("#project-switcher").addEventListener("click", (e) => {
   const recents = recentProjects().filter((p) => p !== state.root).slice(0, 8);
   if (recents.length) {
     items.push("-", { header: "Recent Projects" });
-    for (const p of recents) items.push({ label: basename(p), hint: p.replace(/^\/Users\/[^/]+/, "~"), action: () => openProject(p) });
+    for (const p of recents) items.push({ label: basename(p), hint: tildify(p), action: () => openProject(p) });
   }
   if (state.root) items.push("-", { label: "Close Project", action: () => closeProject() });
   contextMenu(r.left, r.bottom + 4, items);
@@ -319,7 +326,7 @@ $("#sb-interp").addEventListener("click", (e) => {
       action: async () => {
         // Choosing the folder (not bin/python) avoids the dialog resolving the venv symlink.
         const dir = await openDialog({ directory: true, defaultPath: state.root, title: "Select a virtual environment folder" });
-        if (dir) setInterpreter(join(dir, "bin", "python"));
+        if (dir) setInterpreter(normalizePath(dir)); // the backend finds bin/python or Scripts\\python.exe
       },
     },
     {
@@ -327,7 +334,7 @@ $("#sb-interp").addEventListener("click", (e) => {
       icon: icons.python,
       action: async () => {
         const file = await openDialog({ directory: false, title: "Select a Python executable" });
-        if (file) setInterpreter(file);
+        if (file) setInterpreter(normalizePath(file));
       },
     },
     {
@@ -627,7 +634,30 @@ function toast(text, kind = "info") {
 
 $("#btn-search").addEventListener("click", goToFile);
 
-// ---------------------------------------------------------------- shortcuts (PyCharm macOS keymap)
+// ---------------------------------------------------------------- shortcuts (PyCharm keymap for this OS)
+const actions = {
+  saveAll: () => editor.saveAll(),
+  runFile: () => runCurrent(),
+  rerun: () => (runPanel.last ? runPanel.rerun() : runCurrent()),
+  stop: () => runPanel.stop(),
+  terminal: () => showBottom("terminal"),
+  project: () => toggleProject(),
+  runTool: () => showBottom("run"),
+  goToFile: () => goToFile(),
+  goToLine: () => editor.active && goToLine(),
+  closeTab: () => editor.active && editor.close(editor.active),
+  nextTab: () => cycleTab(1),
+  prevTab: () => cycleTab(-1),
+};
+// Inside the terminal these keys belong to the shell (⌘L/Ctrl+G, ⌘W/Ctrl+F4 are fine elsewhere).
+const NOT_IN_TERMINAL = new Set(["goToLine", "closeTab"]);
+
+function cycleTab(step) {
+  if (!editor.order.length) return;
+  const i = editor.order.indexOf(editor.active) + step;
+  editor.activate(editor.order[(i + editor.order.length) % editor.order.length]);
+}
+
 let lastShift = 0;
 let shiftClean = false;
 window.addEventListener(
@@ -638,31 +668,18 @@ window.addEventListener(
       return;
     }
     shiftClean = false;
-    const cmd = e.metaKey && !e.ctrlKey;
-    const k = e.key.toLowerCase();
-    // The shell owns Ctrl-keys (Ctrl+R = history search) and Esc inside the terminal.
+    // The shell owns plain Ctrl-keys (Ctrl+C, Ctrl+R history search, …) and Esc inside the terminal.
     const inTerminal = !!e.target.closest?.(".xterm");
-    let handled = true;
-    if (cmd && !e.shiftKey && k === "s") editor.saveAll();
-    else if (!inTerminal && e.ctrlKey && e.shiftKey && !e.metaKey && k === "r") runCurrent();
-    else if (!inTerminal && e.ctrlKey && !e.shiftKey && !e.metaKey && k === "r") runPanel.last ? runPanel.rerun() : runCurrent();
-    else if (cmd && e.key === "F2") runPanel.stop();
-    else if (e.altKey && !e.metaKey && e.key === "F12") showBottom("terminal");
-    else if (cmd && !e.shiftKey && k === "1") toggleProject();
-    else if (cmd && !e.shiftKey && k === "4") showBottom("run");
-    else if (cmd && e.shiftKey && k === "o") goToFile();
-    else if (!inTerminal && cmd && !e.shiftKey && k === "l" && editor.active) goToLine();
-    else if (!inTerminal && cmd && !e.shiftKey && k === "w" && editor.active) editor.close(editor.active);
-    else if (cmd && e.shiftKey && (e.key === "[" || e.key === "]") && editor.order.length) {
-      const i = editor.order.indexOf(editor.active) + (e.key === "]" ? 1 : -1);
-      editor.activate(editor.order[(i + editor.order.length) % editor.order.length]);
-    } else if (e.key === "Escape" && overlay.classList.contains("open")) closeOverlay();
-    else if (e.key === "Escape" && state.layout.bottomView && document.activeElement?.closest("#run-view")) editor.view.focus();
-    else handled = false;
-    if (handled) {
-      e.preventDefault();
-      e.stopPropagation();
+    let action = null;
+    if (!(inTerminal && e.ctrlKey && !e.shiftKey)) {
+      action = Object.keys(actions).find((a) => matches(e, keymap[a]) && !(inTerminal && NOT_IN_TERMINAL.has(a)));
     }
+    if (action) actions[action]();
+    else if (e.key === "Escape" && overlay.classList.contains("open")) closeOverlay();
+    else if (e.key === "Escape" && state.layout.bottomView && document.activeElement?.closest("#run-view")) editor.view.focus();
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
   },
   true
 );

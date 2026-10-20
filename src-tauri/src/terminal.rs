@@ -46,14 +46,31 @@ pub fn term_spawn(
 ) -> Result<u32, String> {
     let pair = native_pty_system().openpty(size(cols, rows)).map_err(|e| e.to_string())?;
 
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
+    let shell = util::default_shell();
     let mut cmd = CommandBuilder::new(&shell);
-    cmd.arg("-l");
+    if cfg!(unix) {
+        cmd.arg("-l");
+    } else if shell.file_stem().is_some_and(|n| n.eq_ignore_ascii_case("pwsh") || n.eq_ignore_ascii_case("powershell")) {
+        cmd.arg("-NoLogo");
+    }
     cmd.cwd(&cwd);
-    cmd.env("PATH", util::user_path());
     cmd.env("TERM", "xterm-256color");
     cmd.env("COLORTERM", "truecolor");
     cmd.env("TERM_PROGRAM", "Pyrite");
+
+    // Windows has no login profile that rewrites PATH, and PowerShell's execution
+    // policy often blocks Activate.ps1, so activate the venv through the environment.
+    let mut path = util::user_path().to_string();
+    if cfg!(windows) {
+        if let Some(venv) = &venv {
+            let bin = Path::new(venv).join(util::VENV_BIN);
+            path = std::env::join_paths(std::iter::once(bin).chain(std::env::split_paths(&path)))
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or(path);
+            cmd.env("VIRTUAL_ENV", venv);
+        }
+    }
+    cmd.env("PATH", path);
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
@@ -63,6 +80,7 @@ pub fn term_spawn(
 
     // Login profiles (e.g. macOS path_helper) rewrite PATH, so activate the venv
     // after the shell has started instead of only setting environment variables.
+    #[cfg(unix)]
     if let Some(venv) = venv {
         let fish = Path::new(&shell).file_name().is_some_and(|n| n == "fish");
         let script = Path::new(&venv).join("bin").join(if fish { "activate.fish" } else { "activate" });

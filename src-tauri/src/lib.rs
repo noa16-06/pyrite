@@ -3,12 +3,15 @@ mod runner;
 mod terminal;
 mod util;
 
+#[cfg(target_os = "macos")]
 use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
+#[cfg(target_os = "macos")]
 use tauri::{AppHandle, Wry};
 
 /// macOS needs an Edit menu for clipboard shortcuts to reach the webview.
 /// Undo/redo and "Close Window" are left out on purpose so that ⌘Z / ⌘W reach
 /// the editor instead of being swallowed by native menu accelerators.
+#[cfg(target_os = "macos")]
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let app_menu = Submenu::with_items(
         app,
@@ -54,9 +57,11 @@ pub fn run() {
         util::user_path();
     });
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
-        .menu(build_menu)
+    let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
+    // Windows and Linux keep their native window frame and need no app menu.
+    #[cfg(target_os = "macos")]
+    let builder = builder.menu(build_menu);
+    builder
         .manage(runner::RunState::default())
         .manage(terminal::Terminals::default())
         .invoke_handler(tauri::generate_handler![
