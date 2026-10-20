@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Shown by GNOME Software, KDE Discover and `dnf info`. Installed into
+     /usr/share/metainfo by the deb and rpm bundles. -->
+<component type="desktop-application">
+  <id>dev.pyrite.ide</id>
+  <launchable type="desktop-id">Pyrite.desktop</launchable>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <name>Pyrite</name>
+  <summary>A fast, lightweight Python IDE</summary>
+
+  <description>
+    <p>
+      Pyrite is a small Python IDE inspired by PyCharm. It starts quickly, keeps
+      PyCharm's keymap and dark colour scheme, and stays out of the way.
+    </p>
+    <ul>
+      <li>Project tree with create, rename and move-to-trash</li>
+      <li>Tabbed editor with Python, JSON and Markdown highlighting, and autosave</li>
+      <li>Run console that accepts stdin and turns traceback lines into links</li>
+      <li>Integrated terminal that activates the project's virtualenv</li>
+      <li>Interpreter detection for .venv, venv and env, or pick your own</li>
+      <li>Go to File and Go to Line</li>
+    </ul>
+    <p>
+      Pyrite needs a Python interpreter to run your code. Install your
+      distribution's python3 package if you do not have one already.
+    </p>
+  </description>
+
+  <categories>
+    <category>Development</category>
+    <category>IDE</category>
+  </categories>
+
+  <keywords>
+    <keyword>Python</keyword>
+    <keyword>IDE</keyword>
+    <keyword>Editor</keyword>
+  </keywords>
+
+  <url type="homepage">https://github.com/noa16-06/pyrite</url>
+  <url type="bugtracker">https://github.com/noa16-06/pyrite/issues</url>
+
+  <developer id="dev.pyrite">
+    <name>noa16-06</name>
+  </developer>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.1.0" date="2026-10-20">
+      <description>
+        <p>First release: project tree, editor, run console and terminal.</p>
+      </description>
+    </release>
+  </releases>
+</component>

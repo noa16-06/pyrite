@@ -47,3 +47,50 @@ jobs:
           releaseName: Pyrite ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
           releaseBody: Installers for macOS (.dmg), Windows (.msi / .exe) and Linux (.AppImage / .deb / .rpm).
           releaseDraft: true
+
+      - name: Make the deb installable on both pre- and post-t64 Debians
+        if: runner.os == 'Linux'
+        run: packaging/linux/fix-deb-depends.sh
+
+      # A package whose dependencies are named wrong still builds fine and only
+      # fails on the user's machine, so install them for real, on one distro per
+      # packaging family. The release stays a draft until this passes.
+      - name: Verify the Linux packages install
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          bundle="$PWD/src-tauri/target/release/bundle"
+
+          # Installing proves the dependency names are right. Resolving every
+          # shared library proves the binary will actually start — that is what
+          # catches a glibc baseline newer than the distribution ships.
+          check='ldd /usr/bin/pyrite >/tmp/ldd 2>&1
+                 if grep -q "not found" /tmp/ldd; then grep "not found" /tmp/ldd; exit 1; fi'
+          try() {
+            echo "::group::$1"
+            docker run --rm -v "$bundle:/pkg:ro" "$1" sh -c "set -e; $2; $check"
+            echo "::endgroup::"
+          }
+
+          # Ubuntu 24.04 and Debian 13 renamed libgtk-3-0 to libgtk-3-0t64;
+          # 22.04 and Debian 12 did not. The deb has to install on both.
+          for image in debian:12 ubuntu:22.04 ubuntu:24.04; do
+            try "$image" 'apt-get -qq update && DEBIAN_FRONTEND=noninteractive apt-get -qq install -y /pkg/deb/*.deb'
+          done
+
+          # The rpm asks for library sonames rather than package names, which is
+          # what lets one file satisfy both Fedora and openSUSE.
+          try fedora:latest 'dnf install -y /pkg/rpm/*.rpm'
+          try opensuse/tumbleweed 'zypper --non-interactive --no-gpg-checks install /pkg/rpm/*.rpm'
+
+      # tauri-action already attached the unpatched deb, so replace that asset
+      # with the one the step above fixed and verified.
+      - name: Re-upload the fixed deb
+        if: runner.os == 'Linux'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag='${{ github.ref_type == 'tag' && github.ref_name || '' }}'
+          [ -n "$tag" ] || tag="v$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          gh release upload "$tag" src-tauri/target/release/bundle/deb/*.deb --clobber

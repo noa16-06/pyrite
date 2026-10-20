@@ -1,5 +1,7 @@
 mod dap;
 mod fs_ops;
+#[cfg(target_os = "linux")]
+mod linux;
 mod lsp;
 mod runner;
 mod terminal;
@@ -55,6 +57,11 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Has to come before GTK is initialised and before any thread exists,
+    // because it works by setting environment variables.
+    #[cfg(target_os = "linux")]
+    linux::prepare();
+
     // Resolve the user's login-shell PATH early, off the main thread.
     std::thread::spawn(|| {
         util::user_path();

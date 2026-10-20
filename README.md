@@ -62,10 +62,17 @@ Requirements on every OS: Node.js 20+ and Rust (stable). Plus, per OS:
 
 - **macOS:** Xcode Command Line Tools (`xcode-select --install`)
 - **Windows:** [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ("Desktop development with C++"); WebView2 is already part of Windows 10/11
-- **Linux (Debian/Ubuntu):**
-  `sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev`
 
-See the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for other distros.
+On Linux the libraries are the same everywhere, but the package names are not:
+
+| Distribution | Build dependencies |
+|---|---|
+| Debian, Ubuntu, Mint, Pop!_OS | `sudo apt install build-essential curl wget file libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev libssl-dev librsvg2-dev` |
+| Fedora, RHEL | `sudo dnf install @development-tools webkit2gtk4.1-devel gtk3-devel libxdo-devel openssl-devel librsvg2-devel` |
+| Arch, Manjaro | `sudo pacman -S --needed base-devel webkit2gtk-4.1 gtk3 xdotool openssl librsvg` |
+| openSUSE | `sudo zypper install -t pattern devel_basis && sudo zypper install webkitgtk3-devel gtk3-devel xdotool-devel libopenssl-devel librsvg-devel` |
+
+See the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) if your distribution is not listed.
 
 ## Installers
 
@@ -75,6 +82,44 @@ The **Release** workflow builds installers for macOS, Windows and Linux and atta
 - **Windows:** SmartScreen → More info → Run anyway
 
 `examples/demo` is a small project to try Run, stdin, and traceback links on.
+
+### Installing on Linux
+
+| Distribution | Install |
+|---|---|
+| Ubuntu, Debian, Mint, Pop!_OS | `sudo apt install ./Pyrite_0.1.0_amd64.deb` |
+| Fedora, RHEL | `sudo dnf install ./Pyrite-0.1.0-1.x86_64.rpm` |
+| openSUSE | `sudo zypper install ./Pyrite-0.1.0-1.x86_64.rpm` |
+| Arch, Manjaro, EndeavourOS | `cd packaging/arch && makepkg -si` |
+| Anything else | `chmod +x Pyrite_*.AppImage && ./Pyrite_*.AppImage` |
+
+The same `.rpm` serves Fedora and openSUSE because it asks for library sonames
+(`libwebkit2gtk-4.1.so.0`) instead of package names, which the two distributions
+spell differently. Every release is installed into a container for each of these
+families before it ships.
+
+Releases are built on Ubuntu 22.04, so the packages need glibc 2.35 or newer:
+Ubuntu 22.04+, Debian 12+, Mint 21+, Pop!_OS 22.04+, Fedora 36+, openSUSE Leap
+15.6+ and any rolling release. On anything older, build from source.
+
+Pyrite needs a Python interpreter to run your code. The deb and rpm recommend
+`python3`, which your package manager installs by default, but Pyrite also works
+with any virtualenv you point it at from the status bar.
+
+### If the window comes up blank
+
+WebKitGTK's DMA-BUF renderer misbehaves on the proprietary NVIDIA driver and
+under software rendering. Pyrite detects both and disables it, but if you hit a
+case it misses, start it with:
+
+```bash
+WEBKIT_DISABLE_DMABUF_RENDERER=1 pyrite
+```
+
+Setting the variable yourself always overrides the detection. If the **AppImage**
+will not start at all, your distribution is probably missing FUSE 2 (Fedora and
+Arch no longer ship it); either install it (`sudo dnf install fuse`,
+`sudo pacman -S fuse2`) or run it with `--appimage-extract-and-run`.
 
 ## Roadmap
 
