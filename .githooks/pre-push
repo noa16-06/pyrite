@@ -1,0 +1,14 @@
+#!/bin/sh
+# Blocks pushing to main: it only changes by merging a pull request on GitHub (see CLAUDE.md).
+# Enabled by `npm install` (git config core.hooksPath .githooks).
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main | refs/heads/master)
+      echo "✋ Pushing to '${remote_ref#refs/heads/}' is not allowed — push a branch and open a pull request:" >&2
+      echo "     git push -u origin <branch> && gh pr create --base main" >&2
+      exit 1
+      ;;
+  esac
+done
+exit 0
