@@ -12,11 +12,14 @@ const LINK_RE = /File "([^"]+)", line (\d+)|((?:[A-Za-z]:)?[\w./\\-]*\.py):(\d+)
  *   { kind: "script", interpreter, file, cwd }
  *   { kind: "tests", interpreter, targets, cwd, title }   — pytest, with the results tree
  *   { kind: "command", interpreter, args, cwd, title, next? } — e.g. pip install; `next` runs after success
+ *   { kind: "debug", interpreter, file, cwd, debugpy }        — under debugpy, with the Debug pane
  */
 export class RunPanel {
-  constructor(el, { results, onOpenLocation, onStateChange, onContextMenu }) {
+  constructor(el, { results, onOpenLocation, onStateChange, onModeChange, onContextMenu }) {
     this.onOpenLocation = onOpenLocation;
     this.onStateChange = onStateChange;
+    this.onModeChange = onModeChange; // (kind) => void, e.g. to call the tool window "Debug"
+    this.debugger = null; // set by the app; drives the debug pane
     this.running = false;
     this.runId = 0;
     this.last = null;
@@ -30,6 +33,7 @@ export class RunPanel {
         <button class="icon-btn" data-act="clear" title="Clear All">${icons.clear}</button>
       </div>
       <div class="test-pane" style="display: none"></div>
+      <div class="debug-pane" style="display: none"></div>
       <div class="run-console" tabindex="0">
         <pre class="run-output"></pre>
         <pre class="run-output run-detail" style="display: none"></pre>
@@ -38,6 +42,7 @@ export class RunPanel {
     this.out = el.querySelector(".run-output");
     this.detail = el.querySelector(".run-detail");
     this.testPane = el.querySelector(".test-pane");
+    this.debugPane = el.querySelector(".debug-pane");
     this.consoleEl = el.querySelector(".run-console");
     this.stdin = el.querySelector(".run-stdin");
     this.stopBtn = el.querySelector('[data-act="stop"]');
@@ -80,7 +85,7 @@ export class RunPanel {
   }
 
   commandLine(spec) {
-    if (spec.kind === "script") return `${spec.interpreter} ${spec.file}`;
+    if (spec.kind === "script" || spec.kind === "debug") return `${spec.interpreter} ${spec.file}`;
     if (spec.kind === "tests") return `${spec.interpreter} -m pytest ${spec.targets.join(" ")}`;
     return `${spec.interpreter} ${spec.args.join(" ")}`;
   }
@@ -89,10 +94,13 @@ export class RunPanel {
     this.last = spec.kind === "command" && spec.next ? spec.next : spec;
     const id = ++this.runId;
     const isTests = spec.kind === "tests";
+    const isDebug = spec.kind === "debug";
     this.cwd = spec.cwd;
     this.clear();
     this.showDetail(null);
     this.testPane.style.display = isTests ? "" : "none";
+    this.debugPane.style.display = isDebug ? "" : "none";
+    this.onModeChange?.(spec.kind);
     if (isTests) this.tests.begin(spec);
     this.append(this.commandLine(spec) + "\n", "meta");
     this.setRunning(true);
@@ -106,6 +114,7 @@ export class RunPanel {
         this.flushPending("stderr");
         this.append(`\nProcess finished with exit code ${ev.code}\n`, "meta");
         this.setRunning(false);
+        if (isDebug) this.debugger?.end(ev.code);
         if (isTests) {
           this.tests.finish(ev.code);
           if (/No module named pytest/.test(stderr)) this.offerPytestInstall(spec);
@@ -121,6 +130,13 @@ export class RunPanel {
         const testChannel = new Channel();
         testChannel.onmessage = (line) => id === this.runId && this.tests.handle(JSON.parse(line));
         await api.runTests(spec.interpreter, spec.targets, spec.cwd, channel, testChannel);
+      } else if (isDebug) {
+        const port = await api.freePort();
+        // -Xfrozen_modules=off: lets debugpy see stdlib sources (and silences its warning about it).
+        const program = spec.program ?? [spec.file]; // e.g. ["-m", "pytest", file] to debug tests
+        const args = ["-Xfrozen_modules=off", spec.debugpy, "--listen", `127.0.0.1:${port}`, "--wait-for-client", ...program];
+        await api.runPython(spec.interpreter, args, spec.cwd, channel);
+        if (id === this.runId) this.debugger?.start(port);
       } else {
         const args = spec.kind === "script" ? ["-u", spec.file] : spec.args;
         await api.runPython(spec.interpreter, args, spec.cwd, channel);
@@ -130,6 +146,7 @@ export class RunPanel {
       this.append(String(err) + "\n", "stderr");
       this.setRunning(false);
       if (isTests) this.tests.finish(-1);
+      if (isDebug) this.debugger?.end();
     }
   }
 

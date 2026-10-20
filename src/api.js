@@ -24,6 +24,11 @@ export const api = {
   termResize: (id, cols, rows) => invoke("term_resize", { id, cols, rows }),
   termKill: (id) => invoke("term_kill", { id }),
 
+  freePort: () => invoke("free_port"),
+  dapConnect: (port, onEvent) => invoke("dap_connect", { port, onEvent }),
+  dapSend: (id, message) => invoke("dap_send", { id, message }),
+  dapClose: (id) => invoke("dap_close", { id }),
+
   lspStart: (command, args, cwd, interpreter, onEvent) => invoke("lsp_start", { command, args, cwd, interpreter, onEvent }),
   lspSend: (id, message) => invoke("lsp_send", { id, message }),
   lspStop: (id) => invoke("lsp_stop", { id }),
