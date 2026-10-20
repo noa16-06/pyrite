@@ -9,7 +9,11 @@ A fast, lightweight Python IDE inspired by PyCharm, built with Tauri 2 (Rust cor
 - **Run:** runs the current file with the project interpreter, accepts stdin, and turns traceback lines into links
 - **Terminal:** several tabs, uses your login shell, activates the project venv automatically
 - **Interpreter:** auto-detects `.venv`/`venv`/`env`, or you pick one from the status bar
+- **Code insight** ([basedpyright](https://docs.basedpyright.com)): completion, hover docs, parameter info, go to declaration (also ⌘/Ctrl-click), find usages, rename, and type errors as you type
+- **Inspections and formatting** ([Ruff](https://docs.astral.sh/ruff)): lint warnings, Reformat Code, Optimize Imports, and PyCharm's error/warning counter in the editor corner
 - **Go to File**, **Go to Line**, and recent projects
+
+Code insight needs basedpyright and Ruff. When they're missing, Pyrite offers to install them into its own environment in the app data folder, so your project's environment isn't touched. Versions you already have on PATH (`basedpyright-langserver` or `pyright-langserver`, `ruff`) work too. Ruff uses your project's `pyproject.toml` / `ruff.toml` settings.
 
 ## Shortcuts
 
@@ -28,6 +32,14 @@ Pyrite uses PyCharm's default keymap for each OS.
 | Move line up/down | `⌥⇧↑` / `⌥⇧↓` | `Alt+Shift+↑` / `Alt+Shift+↓` |
 | Close tab | `⌘W` | `Ctrl+F4` |
 | Next/previous tab | `⌘⇧]` / `⌘⇧[` | `Alt+→` / `Alt+←` |
+| Go to Declaration | `⌘B` / `⌘`-click | `Ctrl+B` / `Ctrl`-click |
+| Find Usages | `⌥F7` | `Alt+F7` |
+| Rename | `⇧F6` | `Shift+F6` |
+| Parameter Info | `⌘P` | `Ctrl+P` |
+| Basic completion | `⌃Space` | `Ctrl+Space` |
+| Reformat Code | `⌥⌘L` | `Ctrl+Alt+L` |
+| Optimize Imports | `⌃⌥O` | `Ctrl+Alt+O` |
+| Next/previous problem | `F2` / `⇧F2` | `F2` / `Shift+F2` |
 
 ## Development
 
@@ -57,7 +69,7 @@ The **Release** workflow builds installers for macOS, Windows and Linux and atta
 
 ## Roadmap
 
-- Code intelligence (completion, go to definition, inspections) via a Python language server
+- Quick fixes (⌥⏎ / Alt+Enter) from Ruff and basedpyright
 - Debugger (debugpy): breakpoints, stepping, variables
 - pytest runner with a results tree
 - Create venvs and manage pip packages

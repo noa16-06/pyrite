@@ -64,6 +64,24 @@ const theme = EditorView.theme(
     ".cm-tooltip-autocomplete > ul > li": { padding: "2px 8px", fontFamily: "'JetBrains Mono', Menlo, monospace" },
     ".cm-tooltip-autocomplete > ul > li[aria-selected]": { backgroundColor: "#2E436E", color: "#DFE1E5" },
     ".cm-completionIcon": { opacity: 0.8 },
+    ".cm-tooltip.cm-tooltip-hover, .cm-tooltip.cm-lsp-signature-tooltip": { maxWidth: "640px", maxHeight: "320px", overflow: "auto" },
+    ".cm-lsp-documentation": { fontFamily: "-apple-system, 'Segoe UI', sans-serif", fontSize: "12.5px", lineHeight: "1.5" },
+    ".cm-lsp-documentation pre, .cm-lsp-documentation code": { fontFamily: "'JetBrains Mono', Menlo, monospace", fontSize: "12px" },
+    ".cm-lsp-documentation pre": { backgroundColor: "#1E1F22", padding: "6px 8px", borderRadius: "4px" },
+    ".cm-lsp-active-parameter": { color: "#DFE1E5", fontWeight: "bold" },
+    ".cm-tooltip-lint": { padding: "0" },
+    ".cm-diagnostic": { padding: "4px 10px", fontFamily: "-apple-system, 'Segoe UI', sans-serif", fontSize: "12.5px" },
+    ".cm-diagnostic-error": { borderLeft: "3px solid #F75464" },
+    ".cm-diagnostic-warning": { borderLeft: "3px solid #E0A82E" },
+    ".cm-diagnostic-info, .cm-diagnostic-hint": { borderLeft: "3px solid #6F737A" },
+    ".cm-diagnosticSource": { color: "#868A91", fontSize: "11.5px" },
+    // Unused code is greyed out instead of underlined, like PyCharm.
+    ".cm-lintRange-hint.cm-unnecessary": { backgroundImage: "none", opacity: 0.55 },
+    ".cm-deprecated": { textDecoration: "line-through" },
+    ".cm-panel.cm-lsp-reference-panel": { maxHeight: "200px", overflow: "auto", fontSize: "12.5px", outline: "none" },
+    ".cm-panels-bottom": { borderTop: "1px solid #393B40" },
+    ".cm-lsp-reference-file": { color: "#868A91" },
+    ".cm-lsp-reference:hover, .cm-lsp-reference[aria-selected]": { backgroundColor: "#2E436E" },
   },
   { dark: true }
 );
@@ -90,16 +108,21 @@ export class EditorArea {
     this.emptyEl = emptyEl;
     this.onActiveChange = onActiveChange;
     this.onCursor = onCursor;
-    this.tabs = new Map(); // path -> { state, saved (Text), saveTimer }
+    this.tabs = new Map(); // path -> { state, saved (Text), saveTimer, ref: { path } }
     this.order = [];
     this.active = null;
     this.language = new Compartment();
+    this.intel = new Compartment();
+    // Set by the code-insight layer: extension(path), beforeSwitch(), activated(path), changed(path), closed(path).
+    this.hooks = {};
 
     this.view = new EditorView({ parent: editorEl, state: EditorState.create({ doc: "" }) });
     this.view.dom.style.display = "none";
   }
 
-  extensions(path) {
+  /** `ref.path` follows the file through renames, so listeners never act on a stale path. */
+  extensions(ref) {
+    const path = ref.path;
     return [
       lineNumbers(),
       highlightActiveLineGutter(),
@@ -131,9 +154,13 @@ export class EditorArea {
         indentWithTab,
       ]),
       this.language.of(languageFor(path)),
+      this.intel.of(this.hooks.extension?.(path) ?? []),
       theme,
       EditorView.updateListener.of((u) => {
-        if (u.docChanged) this.markChanged(path);
+        if (u.docChanged) {
+          this.markChanged(ref.path);
+          this.hooks.changed?.(ref.path);
+        }
         if (u.selectionSet || u.docChanged) this.reportCursor();
       }),
     ];
@@ -146,8 +173,9 @@ export class EditorArea {
   async open(path, line) {
     if (!this.tabs.has(path)) {
       const text = await api.readFile(path); // throws for binary/huge files
-      const state = EditorState.create({ doc: text, extensions: this.extensions(path) });
-      this.tabs.set(path, { state, saved: state.doc, saveTimer: null });
+      const ref = { path };
+      const state = EditorState.create({ doc: text, extensions: this.extensions(ref) });
+      this.tabs.set(path, { state, saved: state.doc, saveTimer: null, ref });
       const idx = this.active ? this.order.indexOf(this.active) + 1 : this.order.length;
       this.order.splice(idx, 0, path);
     }
@@ -157,6 +185,7 @@ export class EditorArea {
 
   activate(path) {
     if (this.active && this.tabs.has(this.active)) {
+      this.hooks.beforeSwitch?.();
       this.tabs.get(this.active).state = this.view.state;
     }
     this.active = path;
@@ -172,6 +201,7 @@ export class EditorArea {
     this.renderTabs();
     this.reportCursor();
     this.onActiveChange?.(path);
+    if (path) this.hooks.activated?.(path);
   }
 
   async close(path) {
@@ -181,6 +211,7 @@ export class EditorArea {
     const idx = this.order.indexOf(path);
     this.order.splice(idx, 1);
     this.tabs.delete(path);
+    this.hooks.closed?.(path);
     if (this.active === path) {
       this.active = null;
       this.activate(this.order[Math.min(idx, this.order.length - 1)] ?? null);
@@ -191,6 +222,7 @@ export class EditorArea {
 
   async closeAll() {
     await this.saveAll();
+    for (const path of this.order) this.hooks.closed?.(path);
     this.tabs.clear();
     this.order = [];
     this.active = null;
@@ -253,12 +285,39 @@ export class EditorArea {
   renamed(from, to) {
     const remap = (p) => (p === from ? to : p.startsWith(from + "/") ? to + p.slice(from.length) : p);
     const tabs = new Map();
-    for (const [p, tab] of this.tabs) tabs.set(remap(p), tab);
+    for (const [p, tab] of this.tabs) {
+      tab.ref.path = remap(p);
+      tabs.set(tab.ref.path, tab);
+    }
     this.tabs = tabs;
     this.order = this.order.map(remap);
     if (this.active) this.active = remap(this.active);
     this.renderTabs();
     this.onActiveChange?.(this.active);
+  }
+
+  /** Re-applies the code-insight extensions to every tab (e.g. after the language server started). */
+  reconfigureIntel() {
+    for (const path of this.order) {
+      const effects = this.intel.reconfigure(this.hooks.extension?.(path) ?? []);
+      if (path === this.active) this.view.dispatch({ effects });
+      else {
+        const tab = this.tabs.get(path);
+        tab.state = tab.state.update({ effects }).state;
+      }
+    }
+  }
+
+  /** Replaces the active document with `text`, touching only the part that differs so the cursor stays put. */
+  replaceText(text) {
+    const doc = this.view.state.doc.toString();
+    if (doc === text) return;
+    let start = 0;
+    while (start < doc.length && start < text.length && doc[start] === text[start]) start++;
+    let endA = doc.length;
+    let endB = text.length;
+    while (endA > start && endB > start && doc[endA - 1] === text[endB - 1]) endA--, endB--;
+    this.view.dispatch({ changes: { from: start, to: endA, insert: text.slice(start, endB) }, userEvent: "input.format" });
   }
 
   deleted(path) {

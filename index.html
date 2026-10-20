@@ -54,7 +54,13 @@
             <div class="splitter vertical" id="split-left"></div>
             <section id="editor-area">
               <div id="tabs"></div>
-              <div id="editor"></div>
+              <div id="tools-banner" style="display: none">
+                <span class="icon" id="banner-icon"></span>
+                <span class="text">Code insight (completion, go to declaration, inspections, formatting) needs <b>basedpyright</b> and <b>Ruff</b>. Pyrite installs them into its own environment, not your project.</span>
+                <button class="link" id="banner-install">Install</button>
+                <button class="link muted" id="banner-dismiss">Dismiss</button>
+              </div>
+              <div id="editor"><div id="inspections" style="display: none"></div></div>
               <div id="editor-empty">
                 <div class="hints">
                   <div><span>Go to File</span><kbd data-key="doubleShift"></kbd></div>
@@ -90,6 +96,7 @@
         <span>LF</span>
         <span>UTF-8</span>
         <span>4 spaces</span>
+        <button id="sb-lsp"></button>
         <button id="sb-interp" title="Python Interpreter — click to change">No interpreter</button>
       </footer>
 

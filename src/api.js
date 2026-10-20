@@ -22,6 +22,16 @@ export const api = {
   termWrite: (id, data) => invoke("term_write", { id, data }),
   termResize: (id, cols, rows) => invoke("term_resize", { id, cols, rows }),
   termKill: (id) => invoke("term_kill", { id }),
+
+  lspStart: (command, args, cwd, interpreter, onEvent) => invoke("lsp_start", { command, args, cwd, interpreter, onEvent }),
+  lspSend: (id, message) => invoke("lsp_send", { id, message }),
+  lspStop: (id) => invoke("lsp_stop", { id }),
+
+  toolsStatus: () => invoke("tools_status"),
+  toolsInstall: (onEvent) => invoke("tools_install", { onEvent }),
+  ruffCheck: (ruff, path, cwd, text) => invoke("ruff_check", { ruff, path, cwd, text }),
+  ruffFormat: (ruff, path, cwd, text) => invoke("ruff_format", { ruff, path, cwd, text }),
+  ruffOptimizeImports: (ruff, path, cwd, text) => invoke("ruff_optimize_imports", { ruff, path, cwd, text }),
 };
 
 export const basename = (p) => p.replace(/\/+$/, "").split("/").pop();

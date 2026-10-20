@@ -10,6 +10,7 @@ import { EditorArea } from "./editor.js";
 import { ProjectTree } from "./tree.js";
 import { RunPanel } from "./run.js";
 import { TerminalPanel } from "./terminal.js";
+import { Intelligence } from "./intelligence.js";
 
 const $ = (sel) => document.querySelector(sel);
 const appWindow = getCurrentWindow();
@@ -54,6 +55,7 @@ $("#tree-refresh").innerHTML = icons.refresh;
 $("#tree-collapse").innerHTML = icons.collapse;
 $("#bottom-hide").innerHTML = icons.minimize;
 $("#welcome-logo").innerHTML = logo(56);
+$("#banner-icon").innerHTML = icons.python;
 for (const el of document.querySelectorAll("[data-key]")) {
   const text = el.dataset.key === "doubleShift" ? doubleShiftLabel : label(keymap[el.dataset.key]);
   if (el.tagName === "KBD") el.textContent = text;
@@ -76,6 +78,24 @@ const editor = new EditorArea({
     $("#sb-pos").textContent = pos ? `${pos.line}:${pos.col}` : "";
   },
 });
+
+const intel = new Intelligence({
+  editor,
+  openFile: (path) => openFile(path),
+  toast,
+  statusEl: $("#sb-lsp"),
+  problemsEl: $("#inspections"),
+  bannerEl: $("#tools-banner"),
+});
+editor.hooks = {
+  extension: (path) => intel.extension(path),
+  beforeSwitch: () => intel.sync(),
+  activated: (path) => intel.activated(path),
+  changed: (path) => intel.changed(path),
+  closed: (path) => intel.closed(path),
+};
+$("#banner-install").addEventListener("click", () => intel.install());
+$("#banner-dismiss").addEventListener("click", () => intel.dismissBanner());
 
 const tree = new ProjectTree($("#tree"), {
   onOpen: (path) => openFile(path),
@@ -231,7 +251,7 @@ async function openProject(root) {
 
   await tree.load(root);
   const session = store.get("project." + root, {});
-  loadInterpreter(session.interpreter);
+  await loadInterpreter(session.interpreter);
   for (const f of session.tabs ?? []) await editor.open(f).catch(() => {});
   if (session.active && editor.has(session.active)) editor.activate(session.active);
   applyLayout();
@@ -239,6 +259,10 @@ async function openProject(root) {
 
 async function closeProject(showWelcome = true) {
   await editor.closeAll();
+  intel.stop();
+  intel.root = null;
+  $("#tools-banner").style.display = "none";
+  $("#sb-lsp").textContent = "";
   await runPanel.stop();
   runPanel.clear();
   terminals.closeAll();
@@ -288,6 +312,7 @@ async function loadInterpreter(saved) {
     state.interpreter = await api.detectInterpreter(state.root).catch(() => null);
   }
   renderInterpreter();
+  intel.start(state.root, state.interpreter); // the language server resolves imports with this interpreter
 }
 
 function renderInterpreter() {
@@ -308,6 +333,7 @@ async function setInterpreter(path) {
     state.interpreter = await api.interpreterInfo(path);
     store.set("project." + state.root, { ...store.get("project." + state.root, {}), interpreter: path });
     renderInterpreter();
+    intel.restart(state.interpreter);
   } catch (err) {
     toast(String(err), "error");
   }
@@ -398,7 +424,9 @@ async function renamePath(path) {
   try {
     await editor.saveAll();
     await api.renamePath(path, to);
+    const moved = editor.order.filter((p) => p === path || p.startsWith(path + "/"));
     editor.renamed(path, to);
+    intel.renamed(moved);
     await tree.refresh();
     tree.select(to);
   } catch (err) {
@@ -634,6 +662,25 @@ function toast(text, kind = "info") {
 
 $("#btn-search").addEventListener("click", goToFile);
 
+$("#editor").addEventListener("contextmenu", (e) => {
+  if (!editor.active || !/\.pyi?$/.test(editor.active)) return;
+  e.preventDefault();
+  const pos = editor.view.posAtCoords({ x: e.clientX, y: e.clientY });
+  const sel = editor.view.state.selection.main;
+  if (pos != null && (sel.empty || pos < sel.from || pos > sel.to)) editor.view.dispatch({ selection: { anchor: pos } });
+  const item = (text, key, icon) => ({ label: text, hint: label(keymap[key]), icon, action: () => (actions[key](), editor.view.focus()) });
+  contextMenu(e.clientX, e.clientY, [
+    item("Go to Declaration", "goToDeclaration"),
+    item("Find Usages", "findUsages"),
+    item("Rename…", "rename"),
+    "-",
+    item("Reformat Code", "reformat"),
+    item("Optimize Imports", "optimizeImports"),
+    "-",
+    item(`Run '${basename(editor.active)}'`, "runFile", icons.run),
+  ]);
+});
+
 // ---------------------------------------------------------------- shortcuts (PyCharm keymap for this OS)
 const actions = {
   saveAll: () => editor.saveAll(),
@@ -648,9 +695,21 @@ const actions = {
   closeTab: () => editor.active && editor.close(editor.active),
   nextTab: () => cycleTab(1),
   prevTab: () => cycleTab(-1),
+  goToDeclaration: () => intel.goToDeclaration(),
+  findUsages: () => intel.findUsages(),
+  rename: () => intel.rename(),
+  parameterInfo: () => intel.parameterInfo(),
+  reformat: () => intel.reformat(),
+  optimizeImports: () => intel.optimizeImports(),
+  nextProblem: () => intel.nextProblem(),
+  prevProblem: () => intel.nextProblem(true),
 };
 // Inside the terminal these keys belong to the shell (⌘L/Ctrl+G, ⌘W/Ctrl+F4 are fine elsewhere).
 const NOT_IN_TERMINAL = new Set(["goToLine", "closeTab"]);
+// Code actions work on the symbol at the cursor, so they need the editor to have focus.
+const CODE_ACTIONS = new Set([
+  "goToDeclaration", "findUsages", "rename", "parameterInfo", "reformat", "optimizeImports", "nextProblem", "prevProblem",
+]);
 
 function cycleTab(step) {
   if (!editor.order.length) return;
@@ -672,7 +731,10 @@ window.addEventListener(
     const inTerminal = !!e.target.closest?.(".xterm");
     let action = null;
     if (!(inTerminal && e.ctrlKey && !e.shiftKey)) {
-      action = Object.keys(actions).find((a) => matches(e, keymap[a]) && !(inTerminal && NOT_IN_TERMINAL.has(a)));
+      const inEditor = !!e.target.closest?.("#editor");
+      action = Object.keys(actions).find(
+        (a) => matches(e, keymap[a]) && !(inTerminal && NOT_IN_TERMINAL.has(a)) && (inEditor || !CODE_ACTIONS.has(a))
+      );
     }
     if (action) actions[action]();
     else if (e.key === "Escape" && overlay.classList.contains("open")) closeOverlay();
@@ -700,3 +762,5 @@ applyLayout();
 renderWelcome();
 const [lastProject] = recentProjects();
 if (lastProject && store.get("reopenLast", true)) openProject(lastProject).catch(() => closeProject());
+
+if (import.meta.env.DEV) window.__pyrite = { editor, intel }; // for automated UI checks

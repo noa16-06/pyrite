@@ -1,6 +1,8 @@
 mod fs_ops;
+mod lsp;
 mod runner;
 mod terminal;
+mod tools;
 mod util;
 
 #[cfg(target_os = "macos")]
@@ -64,6 +66,7 @@ pub fn run() {
     builder
         .manage(runner::RunState::default())
         .manage(terminal::Terminals::default())
+        .manage(lsp::LspServers::default())
         .invoke_handler(tauri::generate_handler![
             fs_ops::list_dir,
             fs_ops::read_file,
@@ -82,6 +85,14 @@ pub fn run() {
             terminal::term_write,
             terminal::term_resize,
             terminal::term_kill,
+            lsp::lsp_start,
+            lsp::lsp_send,
+            lsp::lsp_stop,
+            tools::tools_status,
+            tools::tools_install,
+            tools::ruff_check,
+            tools::ruff_format,
+            tools::ruff_optimize_imports,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Pyrite");
