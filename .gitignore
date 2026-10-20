@@ -1,0 +1,16 @@
+# Dependencies & build output
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# Python
+__pycache__/
+.pytest_cache/
+.venv/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

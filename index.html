@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pyrite</title>
+  </head>
+  <body>
+    <div id="app" class="no-project">
+      <header id="toolbar" data-tauri-drag-region>
+        <div class="traffic-space" data-tauri-drag-region></div>
+        <button id="project-switcher" class="tb-widget" title="Projects">
+          <span class="proj-badge" id="project-badge">PY</span>
+          <span id="project-name">Pyrite</span>
+          <span class="chevron"></span>
+        </button>
+        <div class="spacer" data-tauri-drag-region></div>
+        <div id="run-widget">
+          <div class="tb-widget run-target" id="run-target" title="Run configuration: the file open in the editor">
+            <span class="icon" data-icon="python"></span>
+            <span id="run-target-name">Current File</span>
+          </div>
+          <button class="tb-icon run" id="btn-run" title="Run current file  ⌃⇧R"></button>
+          <button class="tb-icon stop" id="btn-stop" title="Stop  ⌘F2" disabled></button>
+        </div>
+        <button class="tb-icon" id="btn-search" title="Go to File  ⇧⇧ / ⌘⇧O"></button>
+      </header>
+
+      <div id="main">
+        <nav id="stripe">
+          <div class="stripe-group">
+            <button class="stripe-btn" data-panel="project" title="Project  ⌘1"></button>
+          </div>
+          <div class="stripe-group">
+            <button class="stripe-btn" data-panel="run" title="Run  ⌘4"></button>
+            <button class="stripe-btn" data-panel="terminal" title="Terminal  ⌥F12"></button>
+          </div>
+        </nav>
+
+        <div id="workspace">
+          <div id="upper">
+            <aside id="project-panel">
+              <div class="panel-header">
+                <span class="panel-title">Project</span>
+                <div class="panel-actions">
+                  <button class="icon-btn" id="tree-new-file" title="New Python File"></button>
+                  <button class="icon-btn" id="tree-new-dir" title="New Directory"></button>
+                  <button class="icon-btn" id="tree-refresh" title="Reload from Disk"></button>
+                  <button class="icon-btn" id="tree-collapse" title="Collapse All"></button>
+                </div>
+              </div>
+              <div id="tree" tabindex="0"></div>
+            </aside>
+            <div class="splitter vertical" id="split-left"></div>
+            <section id="editor-area">
+              <div id="tabs"></div>
+              <div id="editor"></div>
+              <div id="editor-empty">
+                <div class="hints">
+                  <div><span>Go to File</span><kbd>⇧⇧</kbd></div>
+                  <div><span>Run Current File</span><kbd>⌃⇧R</kbd></div>
+                  <div><span>Terminal</span><kbd>⌥F12</kbd></div>
+                  <div><span>Project View</span><kbd>⌘1</kbd></div>
+                  <div><span>Go to Line</span><kbd>⌘L</kbd></div>
+                </div>
+              </div>
+            </section>
+          </div>
+          <div class="splitter horizontal" id="split-bottom"></div>
+          <section id="bottom-panel">
+            <div class="panel-header bottom-header">
+              <div class="tool-tabs">
+                <button class="tool-tab" data-view="run">Run</button>
+                <button class="tool-tab" data-view="terminal">Terminal</button>
+              </div>
+              <div class="panel-actions">
+                <button class="icon-btn" id="bottom-hide" title="Hide"></button>
+              </div>
+            </div>
+            <div class="tool-view" id="run-view"></div>
+            <div class="tool-view" id="terminal-view"></div>
+          </section>
+        </div>
+      </div>
+
+      <footer id="statusbar">
+        <span id="sb-path"></span>
+        <span class="spacer"></span>
+        <span id="sb-pos"></span>
+        <span>LF</span>
+        <span>UTF-8</span>
+        <span>4 spaces</span>
+        <button id="sb-interp" title="Python Interpreter — click to change">No interpreter</button>
+      </footer>
+
+      <div id="welcome">
+        <div class="welcome-card">
+          <div class="welcome-brand">
+            <div class="logo" id="welcome-logo"></div>
+            <div>
+              <h1>Pyrite</h1>
+              <p class="muted">A fast Python IDE, written in Rust</p>
+            </div>
+          </div>
+          <div class="welcome-actions">
+            <button class="primary" id="welcome-open">Open Folder…</button>
+          </div>
+          <h2>Recent Projects</h2>
+          <ul id="recent-list"></ul>
+        </div>
+      </div>
+
+      <div id="overlay"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
