@@ -4,8 +4,8 @@ import "@xterm/xterm/css/xterm.css";
 import { api, Channel } from "./api.js";
 import { icons } from "./icons.js";
 
-// ANSI palette from PyCharm's Dark console scheme.
-const THEME = {
+// ANSI palettes from PyCharm's Dark and Light (Default) console schemes.
+const DARK = {
   background: "#1E1F22",
   foreground: "#BCBEC4",
   cursor: "#CED0D6",
@@ -29,12 +29,37 @@ const THEME = {
   brightWhite: "#FFFFFF",
 };
 
+const LIGHT = {
+  background: "#FFFFFF",
+  foreground: "#000000",
+  cursor: "#000000",
+  cursorAccent: "#FFFFFF",
+  selectionBackground: "#A6D2FF",
+  black: "#000000",
+  red: "#CE0505",
+  green: "#067D17",
+  yellow: "#B28C00",
+  blue: "#063FDB",
+  magenta: "#B309B3",
+  cyan: "#028E8E",
+  white: "#929292",
+  brightBlack: "#656565",
+  brightRed: "#FF1616",
+  brightGreen: "#16B42C",
+  brightYellow: "#ECC32C",
+  brightBlue: "#2D61F0",
+  brightMagenta: "#E617E6",
+  brightCyan: "#15C1C1",
+  brightWhite: "#C9C9C9",
+};
+
 export class TerminalPanel {
   constructor(el, { getContext }) {
     this.getContext = getContext; // () => ({ cwd, venv })
     this.sessions = [];
     this.active = null;
     this.counter = 0;
+    this.theme = DARK;
 
     el.innerHTML = `<div class="term-tabs"><div class="term-tab-list"></div><button class="icon-btn term-new" title="New Tab">${icons.plus}</button></div><div class="term-body"></div>`;
     this.tabList = el.querySelector(".term-tab-list");
@@ -42,6 +67,12 @@ export class TerminalPanel {
     el.querySelector(".term-new").addEventListener("click", () => this.create());
 
     new ResizeObserver(() => this.fit()).observe(this.body);
+  }
+
+  /** Switches every terminal between PyCharm's dark and light console colors. */
+  setTheme(light) {
+    this.theme = light ? LIGHT : DARK;
+    for (const s of this.sessions) s.term.options.theme = this.theme;
   }
 
   /** Makes sure at least one terminal exists (opened lazily, like PyCharm). */
@@ -58,7 +89,7 @@ export class TerminalPanel {
     this.body.append(container);
 
     const term = new Terminal({
-      theme: THEME,
+      theme: this.theme,
       fontFamily: "'JetBrains Mono', Menlo, monospace",
       fontSize: 13,
       lineHeight: 1.2,
