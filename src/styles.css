@@ -488,6 +488,10 @@ button.primary:hover { filter: brightness(1.1); }
 .menu-item.checked .label::before { content: "✓ "; color: var(--green); }
 .menu-item .label { flex: none; }
 .menu-item .hint { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; margin-left: 8px; font-size: 12px; }
+.menu-item.submenu .hint { display: none; }
+.menu-item.submenu::after { content: ""; width: 5px; height: 5px; margin-left: auto; padding-left: 0; border-right: 1.5px solid var(--text-muted); border-top: 1.5px solid var(--text-muted); transform: rotate(45deg); }
+.menu-item.submenu .label { margin-right: 24px; }
+.menu-item.open { background: var(--bg-selected); }
 .menu-sep { height: 1px; background: var(--border-soft); margin: 4px 6px; }
 .menu-header { padding: 4px 8px 2px; color: var(--text-muted); font-size: 11px; }
 

@@ -14,6 +14,7 @@ import { Intelligence } from "./intelligence.js";
 import { TestResults, isTestFile, testGutter, refreshTestGutter } from "./tests.js";
 import { Breakpoints, breakpointGutter, refreshBreakpoints } from "./breakpoints.js";
 import { Debugger } from "./debugger.js";
+import { overlay, closeOverlay, contextMenu, promptModal, toast } from "./popups.js";
 
 const $ = (sel) => document.querySelector(sel);
 const appWindow = getCurrentWindow();
@@ -579,84 +580,7 @@ function openTerminalAt(dir) {
   terminals.create().finally(() => (terminalCwd = null));
 }
 
-// ---------------------------------------------------------------- popups
-const overlay = $("#overlay");
-
-function closeOverlay() {
-  overlay.replaceChildren();
-  overlay.classList.remove("open", "dim");
-}
-overlay.addEventListener("mousedown", (e) => {
-  if (e.target === overlay) closeOverlay();
-});
-
-function contextMenu(x, y, items, { anchorBottom = false } = {}) {
-  closeOverlay();
-  const menu = document.createElement("div");
-  menu.className = "menu";
-  for (const item of items) {
-    if (item === "-") {
-      menu.append(Object.assign(document.createElement("div"), { className: "menu-sep" }));
-      continue;
-    }
-    const el = document.createElement("div");
-    if (item.header) {
-      el.className = "menu-header";
-      el.textContent = item.header;
-      menu.append(el);
-      continue;
-    }
-    el.className = "menu-item" + (item.action ? "" : " disabled") + (item.checked ? " checked" : "");
-    el.innerHTML = `<span class="icon">${item.icon ?? ""}</span><span class="label"></span><span class="hint"></span>`;
-    el.querySelector(".label").textContent = item.label;
-    el.querySelector(".hint").textContent = item.hint ?? "";
-    if (item.action) {
-      el.addEventListener("click", () => {
-        closeOverlay();
-        item.action();
-      });
-    }
-    menu.append(el);
-  }
-  overlay.append(menu);
-  overlay.classList.add("open");
-  const rect = menu.getBoundingClientRect();
-  const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
-  const top = anchorBottom ? Math.max(8, y - rect.height) : Math.min(y, window.innerHeight - rect.height - 8);
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
-}
-
-function promptModal({ title, value = "", placeholder = "", selectStem = false }) {
-  return new Promise((resolve) => {
-    closeOverlay();
-    const box = document.createElement("div");
-    box.className = "modal";
-    box.innerHTML = `<div class="modal-title"></div><input spellcheck="false" autocomplete="off" />`;
-    box.querySelector(".modal-title").textContent = title;
-    const input = box.querySelector("input");
-    input.value = value;
-    input.placeholder = placeholder;
-    overlay.append(box);
-    overlay.classList.add("open", "dim");
-    input.focus();
-    if (selectStem && value.includes(".")) input.setSelectionRange(0, value.lastIndexOf("."));
-    else input.select();
-    let done = false;
-    const finish = (v) => {
-      if (done) return;
-      done = true;
-      closeOverlay();
-      resolve(v);
-    };
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") finish(input.value.trim() || null);
-      if (e.key === "Escape") finish(null);
-    });
-    overlay.addEventListener("mousedown", (e) => e.target === overlay && finish(null), { once: true });
-  });
-}
-
+// ---------------------------------------------------------------- go to file
 /** Fuzzy subsequence match; rewards matches in the file name and consecutive characters. */
 function fuzzyScore(query, path) {
   const q = query.toLowerCase();
@@ -743,20 +667,6 @@ async function goToLine() {
   if (!v) return;
   const [l, c] = v.split(":").map((n) => parseInt(n, 10));
   if (l) editor.goToLine(l, c || 1);
-}
-
-let toastTimer;
-function toast(text, kind = "info") {
-  let el = $("#toast");
-  if (!el) {
-    el = Object.assign(document.createElement("div"), { id: "toast" });
-    document.body.append(el);
-  }
-  el.className = kind;
-  el.textContent = text;
-  el.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove("show"), 4000);
 }
 
 $("#btn-search").addEventListener("click", goToFile);
