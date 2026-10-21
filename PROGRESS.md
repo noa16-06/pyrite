@@ -90,7 +90,7 @@ The brief: work out how PyCharm works (`/Applications/PyCharm.app`, 2026.1.4) an
 - Test files are debugged by running `pytest` under debugpy
 - Important detail: debugpy only exits after the client sends `disconnect` in reply to `terminated`.
 
-### Projects, files and the main menu (PR #5)
+### Projects, files and the main menu (PR #6)
 The owner asked for "settings and where to open new projects, files, so it feels more like a real JetBrains IDE". Menu structure, labels and shortcuts were taken from the installed PyCharm 2026.1.4: `idea/PlatformActions.xml` and `keymaps/*.xml` in `lib/intellij.platform.ide.impl.jar`, and the New Project wording from the `.properties` bundles in `plugins/python*/lib`.
 - **Welcome screen** like PyCharm's: sidebar, "Search projects", New Project / Open, recent projects with an options menu, and the big "Welcome to Pyrite" page on first run
 - **New Project dialog** (`newproject.js`, `projects.rs`): name, location (default `~/PyriteProjects`, next free `pythonProject<N>`), Create Git repository (+ `.gitignore`), Create a main.py welcome script (PyCharm's sample with Pyrite's shortcuts), interpreter type Project venv / uv (only when uv is installed) / Base Python, and a list of the Pythons on PATH
