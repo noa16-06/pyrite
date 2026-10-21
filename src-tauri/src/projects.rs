@@ -122,7 +122,30 @@ pub fn has_uv() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::is_python_name;
+    use super::*;
+
+    #[test]
+    fn creates_a_project_with_venv_and_git() {
+        let Some(python) = util::which("python3").or_else(|| util::which("python")) else { return };
+        let root = env::temp_dir().join(format!("pyrite-new-project-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let project = NewProject {
+            path: util::slash(&root),
+            env: "venv".into(),
+            python: util::slash(&python),
+            git: util::which("git").is_some(),
+        };
+        let info = create_project(project).expect("project is created");
+        assert!(util::venv_python(&root.join(".venv")).is_file());
+        assert!(info.venv.is_some());
+        if util::which("git").is_some() {
+            assert!(root.join(".git").is_dir());
+            assert!(fs::read_to_string(root.join(".gitignore")).unwrap().contains(".venv/"));
+        }
+        let again = NewProject { path: util::slash(&root), env: "venv".into(), python: util::slash(&python), git: false };
+        assert!(create_project(again).unwrap_err().contains("already exists"));
+        fs::remove_dir_all(&root).unwrap();
+    }
 
     #[test]
     fn recognises_python_executables() {
