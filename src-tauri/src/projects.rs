@@ -114,6 +114,35 @@ pub fn create_project(project: NewProject) -> Result<InterpreterInfo, String> {
     runner::describe(&interpreter)
 }
 
+#[derive(Deserialize, serde::Serialize)]
+pub struct Package {
+    name: String,
+    version: String,
+}
+
+/// Settings | Project | Python Interpreter: the packages installed for an interpreter.
+#[tauri::command(async)]
+pub fn list_packages(interpreter: String) -> Result<Vec<Package>, String> {
+    let out = util::command(&interpreter)
+        .args(["-m", "pip", "list", "--format=json", "--disable-pip-version-check"])
+        .env("PATH", util::user_path())
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|e| format!("Cannot start {interpreter}: {e}"))?;
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr);
+        return Err(if err.contains("No module named pip") {
+            "pip is not installed for this interpreter".into()
+        } else {
+            err.trim().lines().last().unwrap_or("pip list failed").to_string()
+        });
+    }
+    // pip can print warnings before the JSON, so parse from the first '['.
+    let text = String::from_utf8_lossy(&out.stdout);
+    let json = &text[text.find('[').unwrap_or(0)..];
+    serde_json::from_str(json).map_err(|e| e.to_string())
+}
+
 /// Whether uv is installed, so the New Project dialog can offer it.
 #[tauri::command(async)]
 pub fn has_uv() -> bool {
@@ -142,6 +171,8 @@ mod tests {
             assert!(root.join(".git").is_dir());
             assert!(fs::read_to_string(root.join(".gitignore")).unwrap().contains(".venv/"));
         }
+        let packages = list_packages(util::slash(&util::venv_python(&root.join(".venv")))).expect("pip list works");
+        assert!(packages.iter().any(|p| p.name == "pip"));
         let again = NewProject { path: util::slash(&root), env: "venv".into(), python: util::slash(&python), git: false };
         assert!(create_project(again).unwrap_err().contains("already exists"));
         fs::remove_dir_all(&root).unwrap();
