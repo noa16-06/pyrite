@@ -6,6 +6,8 @@ import { overlay, closeOverlay } from "./popups.js";
 
 const DEFAULTS = {
   // Appearance & Behavior | Appearance
+  theme: "dark", // "dark", "light" or "light-header"
+  syncTheme: false,
   uiCustomFont: false,
   uiFont: "",
   uiFontSize: 13,
@@ -72,6 +74,18 @@ export function softWrapped(path) {
     .some((p) => new RegExp("^" + p.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".") + "$", "i").test(name));
 }
 
+export const THEMES = { dark: "Dark", light: "Light", "light-header": "Light with Light Header" };
+const osDark = window.matchMedia("(prefers-color-scheme: dark)");
+
+/** The theme in use: the chosen one, or Dark/Light following the OS when "Sync with OS" is on. */
+export function effectiveTheme() {
+  if (current.syncTheme) return osDark.matches ? "dark" : "light";
+  return THEMES[current.theme] ? current.theme : "dark";
+}
+
+/** Re-applies settings when the OS switches between light and dark (only matters with "Sync with OS"). */
+osDark.addEventListener("change", () => current.syncTheme && saveSettings({}));
+
 export function indentLabel() {
   return current.useTabs ? "Tab" : `${current.indent} spaces`;
 }
@@ -79,6 +93,7 @@ export function indentLabel() {
 /** Applies Appearance settings to the window. */
 export function applyAppearance() {
   const root = document.documentElement;
+  root.dataset.theme = effectiveTheme();
   if (current.uiCustomFont) {
     if (current.uiFont) root.style.setProperty("--ui-font", `"${current.uiFont}", -apple-system, "Segoe UI", sans-serif`);
     else root.style.removeProperty("--ui-font");
@@ -183,7 +198,7 @@ function pages(ctx) {
       id: "appearance",
       group: "Appearance & Behavior",
       title: "Appearance",
-      keywords: "ui font size custom",
+      keywords: "ui font size custom theme dark light color sync os",
       render(draft) {
         const fontSel = el("select");
         fontSel.append(new Option("System default", ""), ...installed(UI_FONTS, "sans-serif").map((f) => new Option(f, f)));
@@ -192,8 +207,14 @@ function pages(ctx) {
         const size = number(draft, "uiFontSize", { min: 10, max: 18 });
         const sync = () => (fontSel.disabled = size.disabled = !draft.uiCustomFont);
         sync();
+        const theme = el("select");
+        for (const [id, name] of Object.entries(THEMES)) theme.append(new Option(name, id));
+        theme.value = draft.theme;
+        theme.addEventListener("change", () => (draft.theme = theme.value));
+        const syncTheme = () => (theme.disabled = draft.syncTheme);
+        syncTheme();
         return [
-          row("Theme:", select({ theme: "Dark" }, "theme", ["Dark"])),
+          row("Theme:", theme, checkbox(draft, "syncTheme", "Sync with OS", syncTheme)),
           row("", checkbox(draft, "uiCustomFont", "Use custom font:", sync), fontSel, el("span", { textContent: "Size:" }), size),
         ];
       },

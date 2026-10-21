@@ -18,7 +18,7 @@ import { Breakpoints, breakpointGutter, refreshBreakpoints } from "./breakpoints
 import { Debugger } from "./debugger.js";
 import { overlay, closeOverlay, contextMenu, promptModal, toast } from "./popups.js";
 import { newProjectDialog } from "./newproject.js";
-import { settings, saveSettings, onSettingsChange, openSettings, applyAppearance, indentLabel } from "./settings.js";
+import { settings, saveSettings, onSettingsChange, openSettings, applyAppearance, indentLabel, effectiveTheme, THEMES } from "./settings.js";
 
 const $ = (sel) => document.querySelector(sel);
 const appWindow = getCurrentWindow();
@@ -1004,6 +1004,10 @@ function showSettings(page) {
 
 function applySettings() {
   applyAppearance();
+  const theme = effectiveTheme();
+  terminals.setTheme(theme.startsWith("light"));
+  // Native window frame (title bar on Windows/Linux) follows the theme too.
+  appWindow.setTheme(theme.startsWith("light") ? "light" : "dark").catch(() => {});
   editor.applySettings();
   $("#sb-indent").textContent = indentLabel();
   renderCustomize();
@@ -1021,7 +1025,14 @@ function renderCustomize() {
   sizes($("#cz-ui-size"), [11, 12, 13, 14, 15, 16], s.uiCustomFont ? s.uiFontSize : 13);
   sizes($("#cz-editor-size"), [11, 12, 13, 14, 15, 16, 18, 20], s.editorFontSize);
   $("#cz-keymap").textContent = isMac ? "macOS" : "Windows / Linux";
+  const theme = $("#cz-theme");
+  theme.replaceChildren(...Object.entries(THEMES).map(([id, name]) => new Option(name, id)));
+  theme.value = effectiveTheme();
+  theme.disabled = s.syncTheme;
+  $("#cz-sync").checked = s.syncTheme;
 }
+$("#cz-theme").addEventListener("change", (e) => saveSettings({ theme: e.target.value }));
+$("#cz-sync").addEventListener("change", (e) => saveSettings({ syncTheme: e.target.checked }));
 $("#cz-ui-size").addEventListener("change", (e) => {
   const size = Number(e.target.value);
   saveSettings({ uiCustomFont: size !== 13 || settings().uiCustomFont, uiFontSize: size });
