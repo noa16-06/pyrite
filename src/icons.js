@@ -45,6 +45,9 @@ export const icons = {
   minimize: svg(`<path d="M3.5 8h9" stroke="#CED0D6" stroke-width="1.2"/>`),
   close: svg(`<path d="M4.5 4.5l7 7M11.5 4.5l-7 7" stroke="#868A91" stroke-width="1.2"/>`),
   plus: svg(`<path d="M8 3v10M3 8h10" stroke="#CED0D6" stroke-width="1.2"/>`),
+  hamburger: svg(`<path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="#CED0D6" stroke-width="1.2"/>`),
+  more: svg(`<circle cx="8" cy="3.5" r="1.1" fill="#CED0D6"/><circle cx="8" cy="8" r="1.1" fill="#CED0D6"/><circle cx="8" cy="12.5" r="1.1" fill="#CED0D6"/>`),
+  package: svg(`<path d="M1.5 3.5a1 1 0 0 1 1-1h3.6l1.5 1.5h5.9a1 1 0 0 1 1 1v7.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" stroke="#9DA0A8"/><circle cx="8" cy="9" r="1.8" fill="#9DA0A8"/>`),
 };
 
 // Pyrite crystals grow as cubes — the logo is an isometric gold cube.

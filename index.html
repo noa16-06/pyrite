@@ -9,6 +9,7 @@
     <div id="app" class="no-project">
       <header id="toolbar" data-tauri-drag-region>
         <div class="traffic-space" data-tauri-drag-region></div>
+        <button class="tb-icon" id="main-menu" title="Main Menu"></button>
         <button id="project-switcher" class="tb-widget" title="Projects">
           <span class="proj-badge" id="project-badge">PY</span>
           <span id="project-name">Pyrite</span>
@@ -65,6 +66,7 @@
               <div id="editor-empty">
                 <div class="hints">
                   <div><span>Go to File</span><kbd data-key="doubleShift"></kbd></div>
+                  <div><span>Recent Files</span><kbd data-key="recentFiles"></kbd></div>
                   <div><span>Run Current File</span><kbd data-key="runFile"></kbd></div>
                   <div><span>Terminal</span><kbd data-key="terminal"></kbd></div>
                   <div><span>Project View</span><kbd data-key="project"></kbd></div>
@@ -102,20 +104,32 @@
       </footer>
 
       <div id="welcome">
-        <div class="welcome-card">
+        <aside class="welcome-side">
           <div class="welcome-brand">
             <div class="logo" id="welcome-logo"></div>
             <div>
-              <h1>Pyrite</h1>
-              <p class="muted">A fast Python IDE, written in Rust</p>
+              <div class="welcome-app">Pyrite</div>
+              <div class="welcome-version" id="welcome-version"></div>
             </div>
           </div>
-          <div class="welcome-actions">
-            <button class="primary" id="welcome-open">Open Folder…</button>
+          <button class="welcome-nav active" data-page="projects">Projects</button>
+        </aside>
+        <section class="welcome-main" id="welcome-projects">
+          <div class="welcome-top">
+            <input id="welcome-search" type="search" placeholder="Search projects" spellcheck="false" autocomplete="off" />
+            <button class="primary" id="welcome-new">New Project</button>
+            <button class="secondary" id="welcome-open">Open</button>
           </div>
-          <h2>Recent Projects</h2>
           <ul id="recent-list"></ul>
-        </div>
+          <div id="welcome-empty">
+            <h1>Welcome to Pyrite</h1>
+            <p>Create a new project to start from scratch.<br />Open existing project from disk.</p>
+            <div class="welcome-big-actions">
+              <button id="welcome-new-big"><span class="big-icon" data-icon="plus"></span>New Project</button>
+              <button id="welcome-open-big"><span class="big-icon" data-icon="folder"></span>Open</button>
+            </div>
+          </div>
+        </section>
       </div>
 
       <div id="overlay"></div>

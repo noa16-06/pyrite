@@ -24,6 +24,11 @@ export const api = {
   termResize: (id, cols, rows) => invoke("term_resize", { id, cols, rows }),
   termKill: (id) => invoke("term_kill", { id }),
 
+  projectsHome: () => invoke("projects_home"),
+  findPythons: () => invoke("find_pythons"),
+  hasUv: () => invoke("has_uv"),
+  createProject: (project) => invoke("create_project", { project }),
+
   freePort: () => invoke("free_port"),
   dapConnect: (port, onEvent) => invoke("dap_connect", { port, onEvent }),
   dapSend: (id, message) => invoke("dap_send", { id, message }),

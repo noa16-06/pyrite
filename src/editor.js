@@ -331,6 +331,20 @@ export class EditorArea {
     this.view.dispatch({ changes: { from: start, to: endA, insert: text.slice(start, endB) }, userEvent: "input.format" });
   }
 
+  /** File | Reload All from Disk: picks up changes made outside Pyrite in tabs without unsaved edits. */
+  async reloadFromDisk() {
+    await this.saveAll();
+    for (const path of [...this.order]) {
+      const text = await api.readFile(path).catch(() => null);
+      const tab = this.tabs.get(path);
+      if (text == null || !tab || tab.saved.toString() === text) continue;
+      if (path === this.active) this.replaceText(text); // keeps the cursor where it was
+      else tab.state = tab.state.update({ changes: { from: 0, to: tab.state.doc.length, insert: text } }).state;
+      tab.saved = this.currentState(path).doc;
+    }
+    this.renderTabs();
+  }
+
   deleted(path) {
     for (const p of [...this.order]) {
       if (p === path || p.startsWith(path + "/")) {

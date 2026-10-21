@@ -8,6 +8,9 @@ document.documentElement.dataset.os = isMac ? "mac" : isWindows ? "windows" : "l
 const KEYMAP = {
   mac: {
     saveAll: "Meta+S",
+    newElement: "Meta+N",
+    recentFiles: "Meta+E",
+    reloadAll: "Meta+Alt+Y",
     runFile: "Ctrl+Shift+R",
     rerun: "Ctrl+R",
     stop: "Meta+F2",
@@ -37,6 +40,9 @@ const KEYMAP = {
   },
   other: {
     saveAll: "Ctrl+S",
+    newElement: "Alt+Insert",
+    recentFiles: "Ctrl+E",
+    reloadAll: "Ctrl+Alt+Y",
     runFile: "Ctrl+Shift+F10",
     rerun: "Shift+F10",
     stop: "Ctrl+F2",

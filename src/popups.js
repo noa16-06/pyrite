@@ -3,10 +3,11 @@ export const overlay = document.querySelector("#overlay");
 
 export function closeOverlay() {
   overlay.replaceChildren();
-  overlay.classList.remove("open", "dim");
+  overlay.classList.remove("open", "dim", "locked");
 }
+// A "locked" overlay holds a dialog that only its own buttons and keys may close.
 overlay.addEventListener("mousedown", (e) => {
-  if (e.target === overlay) closeOverlay();
+  if (e.target === overlay && !overlay.classList.contains("locked")) closeOverlay();
 });
 
 /**
