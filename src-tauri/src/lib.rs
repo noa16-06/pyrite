@@ -17,8 +17,9 @@ use tauri::{AppHandle, Emitter, Wry};
 /// macOS needs an Edit menu for clipboard shortcuts to reach the webview.
 /// Undo/redo and "Close Window" are left out on purpose so that ⌘Z / ⌘W reach
 /// the editor instead of being swallowed by native menu accelerators.
-/// File and View items have no accelerators for the same reason: the webview
-/// handles their shortcuts, and a click is sent to it as a "menu" event.
+/// File, View and Settings… have no accelerators for the same reason: the webview
+/// handles their shortcuts (which the user can change in Settings | Keymap), and a
+/// click is sent to it as a "menu" event.
 #[cfg(target_os = "macos")]
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let app_menu = Submenu::with_items(
@@ -28,7 +29,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         &[
             &PredefinedMenuItem::about(app, Some("About Pyrite"), None)?,
             &PredefinedMenuItem::separator(app)?,
-            &MenuItem::with_id(app, "settings", "Settings…", true, Some("CmdOrCtrl+,"))?,
+            &MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::hide(app, None)?,
             &PredefinedMenuItem::hide_others(app, None)?,
