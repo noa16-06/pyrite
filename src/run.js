@@ -1,6 +1,6 @@
 import { api, Channel, join } from "./api.js";
 import { icons } from "./icons.js";
-import { keymap, label, normalizePath } from "./platform.js";
+import { normalizePath } from "./platform.js";
 import { TestTree } from "./tests.js";
 
 const MAX_NODES = 8000;
@@ -28,8 +28,8 @@ export class RunPanel {
 
     el.innerHTML = `
       <div class="run-side">
-        <button class="icon-btn" data-act="rerun" title="Rerun  ${label(keymap.rerun)}">${icons.rerun}</button>
-        <button class="icon-btn" data-act="stop" title="Stop  ${label(keymap.stop)}">${icons.stop}</button>
+        <button class="icon-btn" data-act="rerun" data-key="rerun" title="Rerun">${icons.rerun}</button>
+        <button class="icon-btn" data-act="stop" data-key="stop" title="Stop">${icons.stop}</button>
         <button class="icon-btn" data-act="clear" title="Clear All">${icons.clear}</button>
       </div>
       <div class="test-pane" style="display: none"></div>

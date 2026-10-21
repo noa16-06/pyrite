@@ -17,13 +17,13 @@ A fast, lightweight Python IDE inspired by PyCharm, built with Tauri 2 (Rust cor
 - **Projects:** a welcome screen with project search, and a **New Project** dialog like PyCharm's (location, `.venv` via venv or uv, or a base Python, an optional git repository and `main.py` welcome script)
 - **Main menu:** the ☰ button on Windows/Linux and the menu bar on macOS (File, View, Navigate, Run), plus **New…** (file, directory, Python file, Python package) and Open File…
 - **Go to File**, **Go to Line**, **Recent Files**, Reload All from Disk
-- **Settings** (⌘, / Ctrl+Alt+S), laid out like PyCharm's: Appearance (theme, custom UI font), System Settings (reopen projects on startup, default project directory, autosave), Keymap (searchable shortcut list), Editor (line numbers, whitespace, soft wraps, font, size, line height, ligatures, Python tab size and indent) and Project | Python Interpreter (switch interpreter, list installed packages). The welcome screen's Customize page has the common ones.
+- **Settings** (⌘, / Ctrl+Alt+S), laid out like PyCharm's: Appearance (theme, custom UI font), System Settings (reopen projects on startup, default project directory, autosave), Keymap (add, remove and reset shortcuts with conflict detection, Find Actions by Shortcut), Editor (line numbers, whitespace, soft wraps, font, size, line height, ligatures, Python tab size and indent) and Project | Python Interpreter (switch interpreter, list installed packages). The welcome screen's Customize page has the common ones.
 
 Code insight needs basedpyright and Ruff, and the debugger needs debugpy. When they're missing, Pyrite offers to install them into its own environment in the app data folder, so your project's environment isn't touched. Versions you already have on PATH (`basedpyright-langserver` or `pyright-langserver`, `ruff`) work too. Ruff uses your project's `pyproject.toml` / `ruff.toml` settings.
 
 ## Shortcuts
 
-Pyrite uses PyCharm's default keymap for each OS.
+Pyrite uses PyCharm's default keymap for each OS. You can change any of these in Settings › Keymap.
 
 | Action | macOS | Windows / Linux |
 |---|---|---|

@@ -1,8 +1,9 @@
 // Settings (⌘, / Ctrl+Alt+S): PyCharm's Settings dialog with the options Pyrite supports.
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { api } from "./api.js";
-import { keymap, label, doubleShiftLabel, isMac, tildify, normalizePath } from "./platform.js";
+import { tildify, normalizePath, setKeymapOverrides } from "./platform.js";
 import { overlay, closeOverlay } from "./popups.js";
+import { renderKeymapPage, ACTION_NAMES } from "./keymap-editor.js";
 
 const DEFAULTS = {
   // Appearance & Behavior | Appearance
@@ -27,6 +28,8 @@ const DEFAULTS = {
   editorFontSize: 13,
   lineHeight: 1.7,
   ligatures: false,
+  // Keymap: action -> shortcuts, only for actions the user changed
+  keymap: {},
   // Editor | Code Style | Python
   useTabs: false,
   tabSize: 4,
@@ -47,6 +50,7 @@ function load() {
 }
 
 let current = load();
+setKeymapOverrides(current.keymap);
 const listeners = new Set();
 
 export const settings = () => current;
@@ -55,6 +59,7 @@ export const onSettingsChange = (fn) => listeners.add(fn);
 export function saveSettings(next) {
   const prev = current;
   current = { ...current, ...next };
+  setKeymapOverrides(current.keymap);
   try {
     localStorage.setItem(KEY, JSON.stringify(current));
   } catch {
@@ -116,41 +121,6 @@ function installed(fonts, fallback) {
   const base = width(fallback);
   return fonts.filter((f) => f === "JetBrains Mono" || width(`"${f}", ${fallback}`) !== base);
 }
-
-// ---------------------------------------------------------------- keymap page
-const ACTION_NAMES = {
-  goToFile: "Go to File",
-  recentFiles: "Recent Files",
-  goToLine: "Go to Line/Column",
-  newElement: "New…",
-  saveAll: "Save All",
-  reloadAll: "Reload All from Disk",
-  settings: "Settings…",
-  runFile: "Run Current File",
-  rerun: "Rerun",
-  stop: "Stop",
-  debugFile: "Debug Current File",
-  toggleBreakpoint: "Toggle Line Breakpoint",
-  resume: "Resume Program",
-  stepOver: "Step Over",
-  stepInto: "Step Into",
-  stepOut: "Step Out",
-  evaluate: "Evaluate Expression",
-  project: "Project Tool Window",
-  runTool: "Run Tool Window",
-  terminal: "Terminal Tool Window",
-  closeTab: "Close Tab",
-  nextTab: "Select Next Tab",
-  prevTab: "Select Previous Tab",
-  goToDeclaration: "Go to Declaration",
-  findUsages: "Find Usages",
-  rename: "Rename…",
-  parameterInfo: "Parameter Info",
-  reformat: "Reformat Code",
-  optimizeImports: "Optimize Imports",
-  nextProblem: "Next Highlighted Error",
-  prevProblem: "Previous Highlighted Error",
-};
 
 // ---------------------------------------------------------------- dialog building blocks
 const el = (tag, props = {}, ...children) => {
@@ -247,29 +217,7 @@ function pages(ctx) {
       id: "keymap",
       title: "Keymap",
       keywords: "shortcuts keyboard keys " + Object.values(ACTION_NAMES).join(" "),
-      render() {
-        const filter = el("input", { type: "search", placeholder: "Search actions", spellcheck: false });
-        const table = el("div", { className: "keymap-table" });
-        const entries = Object.entries(ACTION_NAMES)
-          .map(([id, name]) => [name, id === "settings" ? (isMac ? "⌘," : "Ctrl+Alt+S") : keymap[id] ? label(keymap[id]) : ""])
-          .concat([["Go to File (Search Everywhere)", doubleShiftLabel]]);
-        const render = () => {
-          const q = filter.value.trim().toLowerCase();
-          table.replaceChildren(
-            ...entries
-              .filter(([n, k]) => !q || n.toLowerCase().includes(q) || k.toLowerCase().includes(q))
-              .map(([n, k]) => el("div", { className: "keymap-row" }, el("span", { textContent: n }), el("kbd", { textContent: k })))
-          );
-        };
-        filter.addEventListener("input", render);
-        render();
-        return [
-          row("Keymap:", select({ km: isMac ? "macOS" : "Windows / Linux" }, "km", [isMac ? "macOS" : "Windows / Linux"])),
-          hint("PyCharm's default keymap for this OS. Custom shortcuts aren't supported yet."),
-          filter,
-          table,
-        ];
-      },
+      render: (draft) => renderKeymapPage(draft),
     },
     {
       id: "editor-general",
@@ -442,6 +390,8 @@ export function openSettings(ctx = {}, pageId) {
     closeOverlay();
   };
   function onKey(e) {
+    // Shortcut recording and menus inside the dialog handle their own keys.
+    if (box.querySelector(".inner-dialog-backdrop") || overlay.querySelector(".dialog-menu")) return;
     if (e.key === "Escape") finish(), e.stopPropagation();
     else if (e.key === "Enter" && e.target.tagName === "INPUT" && e.target !== search) commit(), finish(), e.preventDefault();
   }

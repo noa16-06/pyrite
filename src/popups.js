@@ -76,6 +76,27 @@ export function contextMenu(x, y, items, { anchorBottom = false } = {}) {
   menu.style.top = `${top}px`;
 }
 
+/** A menu over an open dialog: unlike `contextMenu`, it leaves the dialog in place. */
+export function dialogMenu(x, y, items) {
+  overlay.querySelector(".menu.dialog-menu")?.remove();
+  let menu;
+  const close = () => {
+    for (const m of overlay.querySelectorAll(".menu.dialog-menu")) m.remove();
+    document.removeEventListener("mousedown", outside, true);
+    document.removeEventListener("keydown", onKey, true);
+  };
+  const outside = (e) => !e.target.closest(".menu.dialog-menu") && close();
+  const onKey = (e) => e.key === "Escape" && (close(), e.stopPropagation(), e.preventDefault());
+  menu = buildMenu(items, close);
+  menu.classList.add("dialog-menu");
+  overlay.append(menu);
+  const rect = menu.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
+  menu.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`;
+  document.addEventListener("mousedown", outside, true);
+  document.addEventListener("keydown", onKey, true);
+}
+
 export function promptModal({ title, value = "", placeholder = "", selectStem = false }) {
   return new Promise((resolve) => {
     closeOverlay();
