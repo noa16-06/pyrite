@@ -104,7 +104,12 @@ The owner asked for "settings and where to open new projects, files, so it feels
 - Pages: Appearance & Behavior › Appearance (Use custom font + size; theme is Dark only), › System Settings (Reopen projects on startup, default project directory used by New Project, "Save files if the IDE is idle for N sec", "Save files when switching to a different application or a built-in terminal"), Keymap (read-only, searchable), Editor › General (line numbers, whitespaces, "Soft-wrap these files:" patterns), › Font (font from the installed monospace fonts, size, line height, ligatures, live preview), › Code Style › Python (tab character, tab size, indent), Project › Python Interpreter (switch interpreter, `pip list` of its packages via `list_packages`).
 - The editor keeps these in a `prefs` compartment, so changes apply to every open tab immediately. The status bar indent widget shows the setting and opens Code Style.
 - Welcome screen › Customize: IDE font, editor font size, keymap and "All settings…".
-- Not done yet: light theme, editable keymap, installing packages from the interpreter page.
+- Not done yet: editable keymap, installing packages from the interpreter page.
+
+### Light theme (PR #8)
+- Themes: **Dark**, **Light** (dark main toolbar, as in PyCharm) and **Light with Light Header**, plus **Sync with OS** (follows `prefers-color-scheme`, live). Chosen in Settings › Appearance or the welcome screen's Customize page.
+- Colors are PyCharm 2026.1.4's own: `themes/expUI/expUI_light.theme.json` and `expUI_lightScheme.xml` in `lib/intellij.platform.ide.impl.jar`, `colorSchemes/PythonDefault.xml` in the Python plugin, and the Default console ANSI colors from `DefaultColorSchemesManager.xml`.
+- How it works: every color is a CSS variable in `styles.css` (`:root` = Dark, `[data-theme="light"|"light-header"]` overrides). The CodeMirror theme and syntax highlighting use `var(--…)`, so one editor theme serves both; `EditorView.darkTheme` follows the theme. Icons keep their dark-theme SVG colors and are recolored with CSS attribute selectors (`svg [stroke="#CED0D6"]`). xterm.js needs real colors, so `terminal.js` has a DARK and a LIGHT palette. The native window frame follows via `setTheme` (`core:window:allow-set-theme`).
 
 ---
 
@@ -148,7 +153,7 @@ These run in CI only as "it builds and the unit tests pass". Nobody has used the
 - Run configurations: arguments, environment variables, working directory per project
 - Python console (interactive REPL tool window)
 - Debug tests from a gutter icon (currently only whole test files), conditional breakpoints
-- Settings follow-ups: a Light theme, an editable keymap, install/upgrade/remove packages on the Python Interpreter page (together with roadmap item 2)
+- Settings follow-ups: an editable keymap, install/upgrade/remove packages on the Python Interpreter page (together with roadmap item 2)
 - Structure view / breadcrumbs, split editor, local history
 - Jupyter notebook viewer (biggest item)
 - A proper UI test suite in the repo (see section 4)

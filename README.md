@@ -5,7 +5,8 @@ A fast, lightweight Python IDE inspired by PyCharm, built with Tauri 2 (Rust cor
 ## Features (v0.1)
 
 - **Project tree:** create, rename, delete (moves to the Trash), and an "Open in Terminal" action
-- **Editor:** tabs, Python/JSON/Markdown highlighting, PyCharm Dark colors and keymap (macOS or Windows/Linux), autosave
+- **Themes:** PyCharm's Dark, Light and Light with Light Header (editor, terminal and icons included), or Sync with OS
+- **Editor:** tabs, Python/JSON/Markdown highlighting, PyCharm's color schemes and keymap (macOS or Windows/Linux), autosave
 - **Run:** runs the current file with the project interpreter, accepts stdin, and turns traceback lines into links
 - **Terminal:** several tabs, uses your login shell, activates the project venv automatically
 - **Interpreter:** auto-detects `.venv`/`venv`/`env`, or you pick one from the status bar
@@ -16,7 +17,7 @@ A fast, lightweight Python IDE inspired by PyCharm, built with Tauri 2 (Rust cor
 - **Projects:** a welcome screen with project search, and a **New Project** dialog like PyCharm's (location, `.venv` via venv or uv, or a base Python, an optional git repository and `main.py` welcome script)
 - **Main menu:** the ☰ button on Windows/Linux and the menu bar on macOS (File, View, Navigate, Run), plus **New…** (file, directory, Python file, Python package) and Open File…
 - **Go to File**, **Go to Line**, **Recent Files**, Reload All from Disk
-- **Settings** (⌘, / Ctrl+Alt+S), laid out like PyCharm's: Appearance (custom UI font), System Settings (reopen projects on startup, default project directory, autosave), Keymap (searchable shortcut list), Editor (line numbers, whitespace, soft wraps, font, size, line height, ligatures, Python tab size and indent) and Project | Python Interpreter (switch interpreter, list installed packages). The welcome screen's Customize page has the common ones.
+- **Settings** (⌘, / Ctrl+Alt+S), laid out like PyCharm's: Appearance (theme, custom UI font), System Settings (reopen projects on startup, default project directory, autosave), Keymap (searchable shortcut list), Editor (line numbers, whitespace, soft wraps, font, size, line height, ligatures, Python tab size and indent) and Project | Python Interpreter (switch interpreter, list installed packages). The welcome screen's Customize page has the common ones.
 
 Code insight needs basedpyright and Ruff, and the debugger needs debugpy. When they're missing, Pyrite offers to install them into its own environment in the app data folder, so your project's environment isn't touched. Versions you already have on PATH (`basedpyright-langserver` or `pyright-langserver`, `ruff`) work too. Ruff uses your project's `pyproject.toml` / `ruff.toml` settings.
 
