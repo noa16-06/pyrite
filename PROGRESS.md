@@ -148,6 +148,8 @@ These run in CI only as "it builds and the unit tests pass". Nobody has used the
 
 ## 6. To do (roadmap)
 
+Every item below also has a GitHub issue (#10–#26); the README's "What we still need" section links them.
+
 **Next up**
 1. **Check everything in section 5 on Fedora** and fix what's broken (`fix/…` branches).
 2. **Virtual environments and packages** (#6 in the original list): create a `.venv` from Pyrite, a packages tool window (list/install/update/remove with pip or uv). This also solves "pip is blocked by the system Python" when installing pytest.
