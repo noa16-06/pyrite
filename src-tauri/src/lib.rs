@@ -3,19 +3,22 @@ mod fs_ops;
 #[cfg(target_os = "linux")]
 mod linux;
 mod lsp;
+mod projects;
 mod runner;
 mod terminal;
 mod tools;
 mod util;
 
 #[cfg(target_os = "macos")]
-use tauri::menu::{Menu, PredefinedMenuItem, Submenu};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 #[cfg(target_os = "macos")]
-use tauri::{AppHandle, Wry};
+use tauri::{AppHandle, Emitter, Wry};
 
 /// macOS needs an Edit menu for clipboard shortcuts to reach the webview.
 /// Undo/redo and "Close Window" are left out on purpose so that ⌘Z / ⌘W reach
 /// the editor instead of being swallowed by native menu accelerators.
+/// File and View items have no accelerators for the same reason: the webview
+/// handles their shortcuts, and a click is sent to it as a "menu" event.
 #[cfg(target_os = "macos")]
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let app_menu = Submenu::with_items(
@@ -30,6 +33,37 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &PredefinedMenuItem::show_all(app, None)?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::quit(app, Some("Quit Pyrite"))?,
+        ],
+    )?;
+    let item = |id: &str, text: &str| MenuItem::with_id(app, id, text, true, None::<&str>);
+    let file_menu = Submenu::with_items(
+        app,
+        "File",
+        true,
+        &[
+            &item("newProject", "New Project…")?,
+            &item("newElement", "New…")?,
+            &PredefinedMenuItem::separator(app)?,
+            &item("open", "Open…")?,
+            &item("openFile", "Open File…")?,
+            &item("recentProjects", "Recent Projects…")?,
+            &item("closeProject", "Close Project")?,
+            &PredefinedMenuItem::separator(app)?,
+            &item("saveAll", "Save All")?,
+            &item("reloadAll", "Reload All from Disk")?,
+        ],
+    )?;
+    let view_menu = Submenu::with_items(
+        app,
+        "View",
+        true,
+        &[
+            &item("recentFiles", "Recent Files")?,
+            &item("goToFile", "Go to File…")?,
+            &PredefinedMenuItem::separator(app)?,
+            &item("project", "Project")?,
+            &item("runTool", "Run")?,
+            &item("terminal", "Terminal")?,
         ],
     )?;
     let edit_menu = Submenu::with_items(
@@ -52,7 +86,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
             &PredefinedMenuItem::fullscreen(app, None)?,
         ],
     )?;
-    Menu::with_items(app, &[&app_menu, &edit_menu, &window_menu])
+    Menu::with_items(app, &[&app_menu, &file_menu, &edit_menu, &view_menu, &window_menu])
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -70,7 +104,9 @@ pub fn run() {
     let builder = tauri::Builder::default().plugin(tauri_plugin_dialog::init());
     // Windows and Linux keep their native window frame and need no app menu.
     #[cfg(target_os = "macos")]
-    let builder = builder.menu(build_menu);
+    let builder = builder.menu(build_menu).on_menu_event(|app, event| {
+        let _ = app.emit("menu", event.id().0.as_str());
+    });
     builder
         .manage(runner::RunState::default())
         .manage(terminal::Terminals::default())
@@ -99,6 +135,10 @@ pub fn run() {
             dap::dap_connect,
             dap::dap_send,
             dap::dap_close,
+            projects::projects_home,
+            projects::find_pythons,
+            projects::create_project,
+            projects::has_uv,
             lsp::lsp_start,
             lsp::lsp_send,
             lsp::lsp_stop,

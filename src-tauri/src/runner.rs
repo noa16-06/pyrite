@@ -25,12 +25,12 @@ pub enum RunEvent {
     Exit { code: i32 },
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct InterpreterInfo {
     path: String,
-    version: String,
+    pub(crate) version: String,
     /// Root folder of the virtual environment, if this interpreter lives in one.
-    venv: Option<String>,
+    pub(crate) venv: Option<String>,
 }
 
 fn venv_root(python: &Path) -> Option<PathBuf> {
@@ -39,7 +39,7 @@ fn venv_root(python: &Path) -> Option<PathBuf> {
     root.join("pyvenv.cfg").is_file().then(|| root.to_path_buf())
 }
 
-fn describe(python: &Path) -> Result<InterpreterInfo, String> {
+pub fn describe(python: &Path) -> Result<InterpreterInfo, String> {
     let out = util::command(python)
         .arg("--version")
         .stdin(Stdio::null())

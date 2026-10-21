@@ -3,8 +3,10 @@ import "@fontsource/jetbrains-mono/700.css";
 import "./styles.css";
 import { open as openDialog, ask } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getVersion } from "@tauri-apps/api/app";
+import { listen } from "@tauri-apps/api/event";
 import { api, basename, dirname, join } from "./api.js";
-import { keymap, matches, label, doubleShiftLabel, tildify, normalizePath } from "./platform.js";
+import { keymap, matches, label, doubleShiftLabel, tildify, normalizePath, isMac } from "./platform.js";
 import { icons, logo } from "./icons.js";
 import { EditorArea } from "./editor.js";
 import { ProjectTree } from "./tree.js";
@@ -14,6 +16,8 @@ import { Intelligence } from "./intelligence.js";
 import { TestResults, isTestFile, testGutter, refreshTestGutter } from "./tests.js";
 import { Breakpoints, breakpointGutter, refreshBreakpoints } from "./breakpoints.js";
 import { Debugger } from "./debugger.js";
+import { overlay, closeOverlay, contextMenu, promptModal, toast } from "./popups.js";
+import { newProjectDialog } from "./newproject.js";
 
 const $ = (sel) => document.querySelector(sel);
 const appWindow = getCurrentWindow();
@@ -41,6 +45,7 @@ const state = {
   root: null,
   interpreter: null, // { path, version, venv }
   running: false,
+  recentFiles: [], // most recent first, saved per project
   layout: store.get("layout", { left: 280, bottom: 280, project: true, bottomView: null }),
 };
 
@@ -50,6 +55,7 @@ $("#btn-run").innerHTML = icons.run;
 $("#btn-debug").innerHTML = icons.debug;
 $("#btn-stop").innerHTML = icons.stop;
 $("#btn-search").innerHTML = icons.search;
+$("#main-menu").innerHTML = icons.hamburger;
 $('.stripe-btn[data-panel="project"]').innerHTML = icons.project;
 $('.stripe-btn[data-panel="run"]').innerHTML = icons.runTool;
 $('.stripe-btn[data-panel="terminal"]').innerHTML = icons.terminal;
@@ -58,7 +64,7 @@ $("#tree-new-dir").innerHTML = icons.newDir;
 $("#tree-refresh").innerHTML = icons.refresh;
 $("#tree-collapse").innerHTML = icons.collapse;
 $("#bottom-hide").innerHTML = icons.minimize;
-$("#welcome-logo").innerHTML = logo(56);
+$("#welcome-logo").innerHTML = logo(32);
 $("#banner-icon").innerHTML = icons.python;
 for (const el of document.querySelectorAll("[data-key]")) {
   const text = el.dataset.key === "doubleShift" ? doubleShiftLabel : label(keymap[el.dataset.key]);
@@ -73,6 +79,7 @@ const editor = new EditorArea({
   tabsEl: $("#tabs"),
   emptyEl: $("#editor-empty"),
   onActiveChange(path) {
+    if (path) state.recentFiles = [path, ...state.recentFiles.filter((p) => p !== path)].slice(0, 50);
     $("#sb-path").textContent = path && state.root ? path.replace(state.root, basename(state.root)).split("/").join(" › ") : "";
     $("#run-target-name").textContent =
       path && isTestFile(path) ? `pytest in ${basename(path)}` : path && /\.py$/.test(path) ? basename(path) : "Current File";
@@ -113,12 +120,7 @@ const tree = new ProjectTree($("#tree"), {
   onOpen: (path) => openFile(path),
   onContextMenu: ({ x, y, path, isDir }) => {
     const dir = isDir ? path : dirname(path);
-    const items = [
-      { label: "New Python File", icon: icons.python, action: () => newFile(dir) },
-      { label: "New File", icon: icons.text, action: () => newFile(dir, false) },
-      { label: "New Directory", icon: icons.folder, action: () => newDir(dir) },
-      "-",
-    ];
+    const items = [{ label: "New", children: newItems(dir) }, "-"];
     if (!isDir && isTestFile(path)) {
       items.push({ label: `Run 'pytest in ${basename(path)}'`, icon: icons.run, action: () => runTests([path], basename(path)) }, "-");
     } else if (!isDir && /\.py$/.test(path)) {
@@ -242,29 +244,60 @@ function recentProjects() {
 function renderWelcome() {
   const list = $("#recent-list");
   const recents = recentProjects();
+  const q = $("#welcome-search").value.trim().toLowerCase();
+  const shown = recents.filter((p) => !q || p.toLowerCase().includes(q));
+  // PyCharm swaps the project list for a big "Welcome" page until something has been opened.
+  $("#welcome").classList.toggle("first-run", !recents.length);
   list.replaceChildren(
-    ...recents.map((path) => {
+    ...shown.map((path) => {
       const li = document.createElement("li");
-      li.innerHTML = `<span class="proj-badge"></span><div class="recent-text"><div class="recent-name"></div><div class="recent-path"></div></div><button class="icon-btn remove" title="Remove from list">${icons.close}</button>`;
+      li.tabIndex = 0;
+      li.innerHTML = `<span class="proj-badge"></span><div class="recent-text"><div class="recent-name"></div><div class="recent-path"></div></div><button class="icon-btn more" title="Options">${icons.more}</button>`;
       li.querySelector(".proj-badge").textContent = badge(basename(path));
       li.querySelector(".recent-name").textContent = basename(path);
       li.querySelector(".recent-path").textContent = tildify(path);
+      const remove = () => {
+        store.set("recent", recentProjects().filter((p) => p !== path));
+        renderWelcome();
+      };
+      const options = (x, y) =>
+        contextMenu(x, y, [
+          { label: "Open", icon: icons.folder, action: () => openProject(path) },
+          "-",
+          { label: "Remove from Recent Projects…", action: remove },
+        ]);
       li.addEventListener("click", (e) => {
-        if (e.target.closest(".remove")) {
-          store.set("recent", recentProjects().filter((p) => p !== path));
-          renderWelcome();
+        if (e.target.closest(".more")) {
+          const r = e.target.closest(".more").getBoundingClientRect();
+          options(r.left, r.bottom + 4);
         } else openProject(path);
+      });
+      li.addEventListener("contextmenu", (e) => (e.preventDefault(), options(e.clientX, e.clientY)));
+      li.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") openProject(path);
+        else if (e.key === "Delete" || e.key === "Backspace") remove();
+        else if (e.key === "ArrowDown") li.nextElementSibling?.focus();
+        else if (e.key === "ArrowUp") (li.previousElementSibling ?? $("#welcome-search")).focus();
+        else return;
+        e.preventDefault();
       });
       return li;
     })
   );
-  if (!recents.length) {
+  if (recents.length && !shown.length) {
     const li = document.createElement("li");
     li.className = "empty";
-    li.textContent = "No recent projects yet — open a folder to get started.";
+    li.textContent = "Nothing to show";
     list.append(li);
   }
 }
+
+$("#welcome-search").addEventListener("input", renderWelcome);
+$("#welcome-search").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown") $("#recent-list li:not(.empty)")?.focus(), e.preventDefault();
+  if (e.key === "Enter") $("#recent-list li:not(.empty)")?.click();
+});
+getVersion().then((v) => ($("#welcome-version").textContent = v)).catch(() => {});
 
 function badge(name) {
   const parts = name.split(/[-_ .]+/).filter(Boolean);
@@ -272,8 +305,26 @@ function badge(name) {
 }
 
 async function chooseProject() {
-  const dir = await openDialog({ directory: true, multiple: false, title: "Open Project Folder" });
+  const dir = await openDialog({ directory: true, multiple: false, title: "Open File or Project" });
   if (dir) await openProject(normalizePath(dir));
+}
+
+/** File | Open File…: opens a file in the current project, or its folder as a project when none is open. */
+async function chooseFile() {
+  const file = await openDialog({ directory: false, multiple: false, title: "Open File" });
+  if (!file) return;
+  const path = normalizePath(file);
+  if (!state.root) await openProject(dirname(path));
+  await openFile(path);
+}
+
+async function newProject() {
+  const created = await newProjectDialog();
+  if (!created) return;
+  const session = store.get("project." + created.root, {});
+  store.set("project." + created.root, { ...session, interpreter: created.interpreter.path });
+  await openProject(created.root);
+  if (created.welcome) await openFile(created.welcome);
 }
 
 async function openProject(root) {
@@ -289,6 +340,7 @@ async function openProject(root) {
 
   await tree.load(root);
   const session = store.get("project." + root, {});
+  state.recentFiles = session.recentFiles ?? [];
   breakpoints.load(session.breakpoints);
   await loadInterpreter(session.interpreter);
   for (const f of session.tabs ?? []) await editor.open(f).catch(() => {});
@@ -328,18 +380,28 @@ function saveSession() {
     ...store.get("project." + state.root, {}),
     tabs: editor.order,
     active: editor.active,
+    recentFiles: state.recentFiles,
   });
 }
 
-$("#welcome-open").addEventListener("click", chooseProject);
+for (const id of ["#welcome-open", "#welcome-open-big"]) $(id).addEventListener("click", chooseProject);
+for (const id of ["#welcome-new", "#welcome-new-big"]) $(id).addEventListener("click", newProject);
+
+function recentProjectItems() {
+  return recentProjects()
+    .filter((p) => p !== state.root)
+    .slice(0, 10)
+    .map((p) => ({ label: basename(p), hint: tildify(p), action: () => openProject(p) }));
+}
+
 $("#project-switcher").addEventListener("click", (e) => {
   const r = e.currentTarget.getBoundingClientRect();
-  const items = [{ label: "Open…", icon: icons.folder, action: chooseProject }];
-  const recents = recentProjects().filter((p) => p !== state.root).slice(0, 8);
-  if (recents.length) {
-    items.push("-", { header: "Recent Projects" });
-    for (const p of recents) items.push({ label: basename(p), hint: tildify(p), action: () => openProject(p) });
-  }
+  const items = [
+    { label: "New Project…", icon: icons.plus, action: newProject },
+    { label: "Open…", icon: icons.folder, action: chooseProject },
+  ];
+  const recents = recentProjectItems();
+  if (recents.length) items.push("-", { header: "Recent Projects" }, ...recents);
   if (state.root) items.push("-", { label: "Close Project", action: () => closeProject() });
   contextMenu(r.left, r.bottom + 4, items);
 });
@@ -440,6 +502,44 @@ async function newFile(dir, pythonFile = true) {
     for (let d = dirname(path); d.startsWith(state.root) && d !== state.root; d = dirname(d)) tree.expand(d);
     await tree.refresh();
     await openFile(path);
+  } catch (err) {
+    toast(String(err), "error");
+  }
+}
+
+/** The "New" group (File | New…, and New in the project view's context menu). */
+function newItems(dir) {
+  return [
+    { label: "File", icon: icons.text, action: () => newFile(dir, false) },
+    { label: "Directory", icon: icons.folder, action: () => newDir(dir) },
+    "-",
+    { label: "Python File", icon: icons.python, action: () => newFile(dir) },
+    { label: "Python Package", icon: icons.package, action: () => newPackage(dir) },
+  ];
+}
+
+/** ⌘N / Alt+Insert: the "New" popup for the folder selected in the project view. */
+function newElement() {
+  if (!state.root) return;
+  const r = $("#tree").getBoundingClientRect();
+  const sel = $("#tree .selected")?.getBoundingClientRect();
+  const visible = state.layout.project && r.width > 0;
+  const x = visible ? r.left + 24 : window.innerWidth / 2 - 110;
+  const y = visible && sel ? sel.bottom + 2 : visible ? r.top + 8 : window.innerHeight / 3;
+  contextMenu(x, y, [{ header: "New" }, ...newItems(tree.targetDir())]);
+}
+
+async function newPackage(dir) {
+  const name = await promptModal({ title: "New Python Package", placeholder: "Name (e.g. app or app.models)" });
+  if (!name) return;
+  const pkg = join(dir, name.replace(/\./g, "/"));
+  try {
+    // Every level of a dotted name becomes a package, as in PyCharm.
+    for (let d = pkg; d.startsWith(dir) && d !== dir; d = dirname(d)) await api.createFile(join(d, "__init__.py")).catch(() => {});
+    tree.expand(dir);
+    for (let d = pkg; d !== dir; d = dirname(d)) tree.expand(d);
+    await tree.refresh();
+    tree.select(join(pkg, "__init__.py"));
   } catch (err) {
     toast(String(err), "error");
   }
@@ -579,84 +679,7 @@ function openTerminalAt(dir) {
   terminals.create().finally(() => (terminalCwd = null));
 }
 
-// ---------------------------------------------------------------- popups
-const overlay = $("#overlay");
-
-function closeOverlay() {
-  overlay.replaceChildren();
-  overlay.classList.remove("open", "dim");
-}
-overlay.addEventListener("mousedown", (e) => {
-  if (e.target === overlay) closeOverlay();
-});
-
-function contextMenu(x, y, items, { anchorBottom = false } = {}) {
-  closeOverlay();
-  const menu = document.createElement("div");
-  menu.className = "menu";
-  for (const item of items) {
-    if (item === "-") {
-      menu.append(Object.assign(document.createElement("div"), { className: "menu-sep" }));
-      continue;
-    }
-    const el = document.createElement("div");
-    if (item.header) {
-      el.className = "menu-header";
-      el.textContent = item.header;
-      menu.append(el);
-      continue;
-    }
-    el.className = "menu-item" + (item.action ? "" : " disabled") + (item.checked ? " checked" : "");
-    el.innerHTML = `<span class="icon">${item.icon ?? ""}</span><span class="label"></span><span class="hint"></span>`;
-    el.querySelector(".label").textContent = item.label;
-    el.querySelector(".hint").textContent = item.hint ?? "";
-    if (item.action) {
-      el.addEventListener("click", () => {
-        closeOverlay();
-        item.action();
-      });
-    }
-    menu.append(el);
-  }
-  overlay.append(menu);
-  overlay.classList.add("open");
-  const rect = menu.getBoundingClientRect();
-  const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
-  const top = anchorBottom ? Math.max(8, y - rect.height) : Math.min(y, window.innerHeight - rect.height - 8);
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
-}
-
-function promptModal({ title, value = "", placeholder = "", selectStem = false }) {
-  return new Promise((resolve) => {
-    closeOverlay();
-    const box = document.createElement("div");
-    box.className = "modal";
-    box.innerHTML = `<div class="modal-title"></div><input spellcheck="false" autocomplete="off" />`;
-    box.querySelector(".modal-title").textContent = title;
-    const input = box.querySelector("input");
-    input.value = value;
-    input.placeholder = placeholder;
-    overlay.append(box);
-    overlay.classList.add("open", "dim");
-    input.focus();
-    if (selectStem && value.includes(".")) input.setSelectionRange(0, value.lastIndexOf("."));
-    else input.select();
-    let done = false;
-    const finish = (v) => {
-      if (done) return;
-      done = true;
-      closeOverlay();
-      resolve(v);
-    };
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") finish(input.value.trim() || null);
-      if (e.key === "Escape") finish(null);
-    });
-    overlay.addEventListener("mousedown", (e) => e.target === overlay && finish(null), { once: true });
-  });
-}
-
+// ---------------------------------------------------------------- go to file
 /** Fuzzy subsequence match; rewards matches in the file name and consecutive characters. */
 function fuzzyScore(query, path) {
   const q = query.toLowerCase();
@@ -675,12 +698,27 @@ function fuzzyScore(query, path) {
   return score - p.length * 0.01;
 }
 
-async function goToFile() {
+const goToFile = () =>
+  filePopup("Files", () => api.listFiles(state.root).catch(() => []), () => [...editor.order].reverse());
+
+/** ⌘E / Ctrl+E: recently opened files, newest first, with the current file second so Enter switches back. */
+const recentFiles = () => {
+  const recent = () => {
+    const list = state.recentFiles.filter((p) => p !== editor.active);
+    return editor.active ? [list[0], editor.active, ...list.slice(1)].filter(Boolean) : list;
+  };
+  const inProject = () => recent().filter((p) => p.startsWith(state.root + "/"));
+  return filePopup("Recent Files", async () => inProject().map((p) => p.slice(state.root.length + 1)), inProject);
+};
+
+/** Search popup over project-relative paths; `recent()` (absolute paths) is shown while the query is empty. */
+async function filePopup(title, load, recent) {
   if (!state.root) return;
   closeOverlay();
   const box = document.createElement("div");
   box.className = "modal search-everywhere";
-  box.innerHTML = `<div class="se-tabs"><span class="active">Files</span></div><input spellcheck="false" autocomplete="off" placeholder="Type a file name…" /><div class="se-results"></div>`;
+  box.innerHTML = `<div class="se-tabs"><span class="active"></span></div><input spellcheck="false" autocomplete="off" placeholder="Type a file name…" /><div class="se-results"></div>`;
+  box.querySelector(".se-tabs .active").textContent = title;
   const input = box.querySelector("input");
   const results = box.querySelector(".se-results");
   overlay.append(box);
@@ -699,7 +737,7 @@ async function goToFile() {
           .sort((a, b) => b.s - a.s)
           .slice(0, 50)
           .map((m) => m.f)
-      : [...editor.order].reverse().map((p) => p.slice(state.root.length + 1)).slice(0, 50);
+      : recent().map((p) => p.slice(state.root.length + 1)).slice(0, 50);
     selected = Math.min(selected, Math.max(0, matches.length - 1));
     results.replaceChildren(
       ...matches.map((rel, i) => {
@@ -731,7 +769,7 @@ async function goToFile() {
     else if (e.key === "Escape") closeOverlay();
   });
   render();
-  files = await api.listFiles(state.root).catch(() => []);
+  files = await load();
   render();
 }
 
@@ -743,20 +781,6 @@ async function goToLine() {
   if (!v) return;
   const [l, c] = v.split(":").map((n) => parseInt(n, 10));
   if (l) editor.goToLine(l, c || 1);
-}
-
-let toastTimer;
-function toast(text, kind = "info") {
-  let el = $("#toast");
-  if (!el) {
-    el = Object.assign(document.createElement("div"), { id: "toast" });
-    document.body.append(el);
-  }
-  el.className = kind;
-  el.textContent = text;
-  el.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove("show"), 4000);
 }
 
 $("#btn-search").addEventListener("click", goToFile);
@@ -782,9 +806,95 @@ $("#editor").addEventListener("contextmenu", (e) => {
   ]);
 });
 
+// ---------------------------------------------------------------- main menu
+async function reloadAll() {
+  if (!state.root) return;
+  await tree.refresh();
+  await editor.reloadFromDisk();
+}
+
+/** Menu-only commands; the rest come from `actions`, so a menu click and its shortcut do the same thing. */
+const menuCommands = {
+  newProject: () => newProject(),
+  open: () => chooseProject(),
+  openFile: () => chooseFile(),
+  closeProject: () => state.root && closeProject(),
+  recentProjects: () => {
+    const items = recentProjectItems();
+    contextMenu(window.innerWidth / 2 - 150, 80, items.length ? [{ header: "Recent Projects" }, ...items] : [{ label: "No recent projects" }]);
+  },
+  exit: () => appWindow.close(),
+};
+
+function runCommand(id) {
+  (menuCommands[id] ?? actions[id])?.();
+}
+
+/** PyCharm's main menu (the ☰ button on Windows and Linux; the menu bar on macOS is native). */
+function mainMenuItems() {
+  const open = !!state.root;
+  const item = (text, id, { icon, enabled = true } = {}) => ({
+    label: text,
+    icon,
+    hint: keymap[id] ? label(keymap[id]) : "",
+    action: () => runCommand(id),
+    disabled: !enabled,
+  });
+  const recents = recentProjectItems();
+  return [
+    {
+      label: "File",
+      children: [
+        { label: "New", children: [item("New Project…", "newProject"), item("New…", "newElement", { enabled: open })] },
+        item("Open…", "open", { icon: icons.folder }),
+        item("Open File…", "openFile"),
+        { label: "Recent Projects", children: recents.length ? recents : [{ label: "No recent projects" }] },
+        item("Close Project", "closeProject", { enabled: open }),
+        "-",
+        item("Save All", "saveAll", { enabled: open }),
+        item("Reload All from Disk", "reloadAll", { icon: icons.refresh, enabled: open }),
+        "-",
+        item("Exit", "exit"),
+      ],
+    },
+    {
+      label: "View",
+      children: [
+        { label: "Tool Windows", children: [item("Project", "project"), item("Run", "runTool"), item("Terminal", "terminal")] },
+        "-",
+        item("Recent Files", "recentFiles", { enabled: open }),
+      ],
+    },
+    {
+      label: "Navigate",
+      children: [item("File…", "goToFile", { enabled: open }), item("Line/Column…", "goToLine", { enabled: !!editor.active })],
+    },
+    {
+      label: "Run",
+      children: [
+        item("Run", "runFile", { icon: icons.run, enabled: open }),
+        item("Debug", "debugFile", { icon: icons.debug, enabled: open }),
+        item("Stop", "stop", { icon: icons.stop, enabled: state.running }),
+        "-",
+        item("Toggle Line Breakpoint", "toggleBreakpoint", { enabled: !!editor.active }),
+      ],
+    },
+  ];
+}
+
+$("#main-menu").addEventListener("click", (e) => {
+  const r = e.currentTarget.getBoundingClientRect();
+  contextMenu(r.left, r.bottom + 4, mainMenuItems());
+});
+if (isMac) $("#main-menu").remove();
+listen("menu", (e) => runCommand(e.payload)).catch(() => {});
+
 // ---------------------------------------------------------------- shortcuts (PyCharm keymap for this OS)
 const actions = {
   saveAll: () => editor.saveAll(),
+  newElement: () => newElement(),
+  recentFiles: () => recentFiles(),
+  reloadAll: () => reloadAll(),
   runFile: () => runCurrent(),
   rerun: () => (runPanel.last ? runPanel.rerun() : runCurrent()),
   stop: () => runPanel.stop(),
@@ -833,6 +943,7 @@ let shiftClean = false;
 window.addEventListener(
   "keydown",
   (e) => {
+    if (overlay.classList.contains("locked")) return; // a dialog is open and handles its own keys
     if (e.key === "Shift") {
       shiftClean = !e.repeat;
       return;
