@@ -90,6 +90,15 @@ The brief: work out how PyCharm works (`/Applications/PyCharm.app`, 2026.1.4) an
 - Test files are debugged by running `pytest` under debugpy
 - Important detail: debugpy only exits after the client sends `disconnect` in reply to `terminated`.
 
+### Projects, files and the main menu (PR #5)
+The owner asked for "settings and where to open new projects, files, so it feels more like a real JetBrains IDE". Menu structure, labels and shortcuts were taken from the installed PyCharm 2026.1.4: `idea/PlatformActions.xml` and `keymaps/*.xml` in `lib/intellij.platform.ide.impl.jar`, and the New Project wording from the `.properties` bundles in `plugins/python*/lib`.
+- **Welcome screen** like PyCharm's: sidebar, "Search projects", New Project / Open, recent projects with an options menu, and the big "Welcome to Pyrite" page on first run
+- **New Project dialog** (`newproject.js`, `projects.rs`): name, location (default `~/PyriteProjects`, next free `pythonProject<N>`), Create Git repository (+ `.gitignore`), Create a main.py welcome script (PyCharm's sample with Pyrite's shortcuts), interpreter type Project venv / uv (only when uv is installed) / Base Python, and a list of the Pythons on PATH
+- **Main menu**: ☰ in the toolbar on Windows/Linux (PyCharm's New UI) with submenus; native File/View menus on macOS. Native items have no accelerators so the webview keeps its shortcuts; clicks arrive as a `menu` event.
+- **New…** (⌘N / Alt+Insert) and a *New ▸* submenu in the project view: File, Directory, Python File, Python Package (dotted names create nested packages)
+- **Recent Files** (⌘E / Ctrl+E, saved per project), **Open File…**, **Reload All from Disk** (⌥⌘Y / Ctrl+Alt+Y)
+- Popups moved to `popups.js`; dialogs use a "locked" overlay so backdrop clicks and global shortcuts don't reach the window behind them
+
 ---
 
 ## 4. How things were tested
@@ -112,7 +121,8 @@ These run in CI only as "it builds and the unit tests pass". Nobody has used the
 - [ ] Test runner with a real project
 - [ ] Debugger: installing debugpy, breakpoints, stepping, variables
 - [ ] Linux shortcuts (Ctrl+Shift+N, Ctrl+G, Shift+F10, Alt+F12, …), and that none clash with GNOME
-- [ ] File dialogs (Open Folder, select interpreter)
+- [ ] File dialogs (Open Folder, Open File, select interpreter)
+- [ ] New Project with venv / uv / git in the real app; the ☰ main menu on Linux
 - [ ] Moving to the trash (`trash` crate) on Linux
 - [ ] `npm run bundle`: `.rpm` / `.AppImage` / `.deb` build and install
 
@@ -131,7 +141,8 @@ These run in CI only as "it builds and the unit tests pass". Nobody has used the
 - Run configurations: arguments, environment variables, working directory per project
 - Python console (interactive REPL tool window)
 - Debug tests from a gutter icon (currently only whole test files), conditional breakpoints
-- Structure view / breadcrumbs, split editor, local history, settings page (theme, font size, keymap)
+- **Settings dialog** (⌘, / Ctrl+Alt+S): PyCharm's tree (Appearance & Behavior, Keymap, Editor, Project: Python Interpreter, Tools) with the settings that exist today (font size, line height, tab size, reopen last project, …), and a Customize page on the welcome screen. Planned as the next PR.
+- Structure view / breadcrumbs, split editor, local history
 - Jupyter notebook viewer (biggest item)
 - A proper UI test suite in the repo (see section 4)
 

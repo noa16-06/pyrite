@@ -13,7 +13,9 @@ A fast, lightweight Python IDE inspired by PyCharm, built with Tauri 2 (Rust cor
 - **Inspections and formatting** ([Ruff](https://docs.astral.sh/ruff)): lint warnings, Reformat Code, Optimize Imports, and PyCharm's error/warning counter in the editor corner
 - **Test runner (pytest):** green ▶ icons next to every `def test_…` and `class Test…`, a results tree (file → class → parametrized cases) with durations, the selected test's output and traceback, Rerun Failed, a Show Passed toggle, and gutter icons that show each test's last result. Test files (`test_*.py` / `*_test.py`) run with pytest from the Run button, and folders from the project tree's context menu. If pytest is missing, Pyrite offers to install it.
 - **Debugger (debugpy):** click the gutter to set breakpoints (they move with your edits and are saved per project), Debug the current file (test files run pytest under the debugger), step over/into/out, pause and resume, frames and an expandable variables tree, Evaluate Expression, a stop on uncaught exceptions, and the execution line highlighted in the editor. The program's output and `input()` stay in the console.
-- **Go to File**, **Go to Line**, and recent projects
+- **Projects:** a welcome screen with project search, and a **New Project** dialog like PyCharm's (location, `.venv` via venv or uv, or a base Python, an optional git repository and `main.py` welcome script)
+- **Main menu:** the ☰ button on Windows/Linux and the menu bar on macOS (File, View, Navigate, Run), plus **New…** (file, directory, Python file, Python package) and Open File…
+- **Go to File**, **Go to Line**, **Recent Files**, Reload All from Disk
 
 Code insight needs basedpyright and Ruff, and the debugger needs debugpy. When they're missing, Pyrite offers to install them into its own environment in the app data folder, so your project's environment isn't touched. Versions you already have on PATH (`basedpyright-langserver` or `pyright-langserver`, `ruff`) work too. Ruff uses your project's `pyproject.toml` / `ruff.toml` settings.
 
@@ -25,6 +27,9 @@ Pyrite uses PyCharm's default keymap for each OS.
 |---|---|---|
 | Go to File | `⇧⇧` / `⌘⇧O` | `Shift Shift` / `Ctrl+Shift+N` |
 | Go to Line | `⌘L` | `Ctrl+G` |
+| Recent Files | `⌘E` | `Ctrl+E` |
+| New… (file, directory, package) | `⌘N` | `Alt+Insert` |
+| Reload All from Disk | `⌥⌘Y` | `Ctrl+Alt+Y` |
 | Run current file | `⌃⇧R` | `Ctrl+Shift+F10` |
 | Rerun | `⌃R` | `Shift+F10` |
 | Stop | `⌘F2` | `Ctrl+F2` |
