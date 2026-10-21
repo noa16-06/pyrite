@@ -6,7 +6,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { api, basename, dirname, join } from "./api.js";
-import { keymap, matches, label, doubleShiftLabel, tildify, normalizePath, isMac } from "./platform.js";
+import { keymap, matchesAction, label, doubleShiftLabel, tildify, normalizePath, isMac } from "./platform.js";
 import { icons, logo } from "./icons.js";
 import { EditorArea } from "./editor.js";
 import { ProjectTree } from "./tree.js";
@@ -67,12 +67,20 @@ $("#tree-collapse").innerHTML = icons.collapse;
 $("#bottom-hide").innerHTML = icons.minimize;
 $("#welcome-logo").innerHTML = logo(32);
 $("#banner-icon").innerHTML = icons.python;
-for (const el of document.querySelectorAll("[data-key]")) {
-  const text = el.dataset.key === "doubleShift" ? doubleShiftLabel : label(keymap[el.dataset.key]);
-  if (el.tagName === "KBD") el.textContent = text;
-  else el.title += `  ${text}`;
+/** Shortcut hints in tooltips and <kbd> elements; re-run when the keymap changes. */
+function renderShortcutLabels() {
+  for (const el of document.querySelectorAll("[data-key]")) {
+    const text = el.dataset.key === "doubleShift" ? doubleShiftLabel : label(keymap[el.dataset.key]);
+    if (el.tagName === "KBD") {
+      el.textContent = text;
+      el.parentElement.style.display = text ? "" : "none";
+    } else {
+      el.dataset.title ??= el.title;
+      el.title = text ? `${el.dataset.title}  ${text}` : el.dataset.title;
+    }
+  }
+  $("#btn-search").title += ` / ${doubleShiftLabel}`;
 }
-$("#btn-search").title += ` / ${doubleShiftLabel}`;
 
 // ---------------------------------------------------------------- components
 const editor = new EditorArea({
@@ -960,7 +968,7 @@ window.addEventListener(
       const inEditor = !!e.target.closest?.("#editor");
       action = Object.keys(actions).find(
         (a) =>
-          matches(e, keymap[a]) &&
+          matchesAction(e, a) &&
           !(inTerminal && NOT_IN_TERMINAL.has(a)) &&
           (inEditor || !CODE_ACTIONS.has(a)) &&
           (!WHILE_PAUSED.has(a) || debug.state === "paused")
@@ -1004,6 +1012,7 @@ function showSettings(page) {
 
 function applySettings() {
   applyAppearance();
+  renderShortcutLabels();
   const theme = effectiveTheme();
   terminals.setTheme(theme.startsWith("light"));
   // Native window frame (title bar on Windows/Linux) follows the theme too.
