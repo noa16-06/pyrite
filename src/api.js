@@ -27,6 +27,7 @@ export const api = {
   projectsHome: () => invoke("projects_home"),
   findPythons: () => invoke("find_pythons"),
   hasUv: () => invoke("has_uv"),
+  listPackages: (interpreter) => invoke("list_packages", { interpreter }),
   createProject: (project) => invoke("create_project", { project }),
 
   freePort: () => invoke("free_port"),

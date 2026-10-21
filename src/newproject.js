@@ -4,6 +4,7 @@ import { api, dirname, join } from "./api.js";
 import { keymap, label, doubleShiftLabel, tildify, normalizePath } from "./platform.js";
 import { icons } from "./icons.js";
 import { overlay, closeOverlay } from "./popups.js";
+import { settings } from "./settings.js";
 
 /** PyCharm's main.py welcome script, with Pyrite's shortcuts for this OS. */
 export function welcomeScript() {
@@ -37,8 +38,9 @@ const field = (labelText, control) => {
 export function newProjectDialog() {
   return new Promise(async (resolve) => {
     closeOverlay();
-    const home = await api.projectsHome().catch(() => "");
-    const userHome = dirname(home);
+    const defaultHome = await api.projectsHome().catch(() => "");
+    const userHome = dirname(defaultHome);
+    const home = settings().projectsDir.replace(/^~(?=\/|$)/, userHome) || defaultHome;
     const existing = new Set((await api.listDir(home).catch(() => [])).map((e) => e.name));
     let name = "pythonProject";
     for (let i = 1; existing.has(name); i++) name = `pythonProject${i}`;

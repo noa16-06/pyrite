@@ -99,6 +99,13 @@ The owner asked for "settings and where to open new projects, files, so it feels
 - **Recent Files** (⌘E / Ctrl+E, saved per project), **Open File…**, **Reload All from Disk** (⌥⌘Y / Ctrl+Alt+Y)
 - Popups moved to `popups.js`; dialogs use a "locked" overlay so backdrop clicks and global shortcuts don't reach the window behind them
 
+### Settings (PR #7)
+- `settings.js` holds the settings (localStorage `pyrite.settings`, defaults merged in, the old `pyrite.reopenLast` key migrated) and PyCharm's Settings dialog: searchable tree on the left, breadcrumb, Cancel / Apply / OK. Labels are PyCharm's own (from its message bundles).
+- Pages: Appearance & Behavior › Appearance (Use custom font + size; theme is Dark only), › System Settings (Reopen projects on startup, default project directory used by New Project, "Save files if the IDE is idle for N sec", "Save files when switching to a different application or a built-in terminal"), Keymap (read-only, searchable), Editor › General (line numbers, whitespaces, "Soft-wrap these files:" patterns), › Font (font from the installed monospace fonts, size, line height, ligatures, live preview), › Code Style › Python (tab character, tab size, indent), Project › Python Interpreter (switch interpreter, `pip list` of its packages via `list_packages`).
+- The editor keeps these in a `prefs` compartment, so changes apply to every open tab immediately. The status bar indent widget shows the setting and opens Code Style.
+- Welcome screen › Customize: IDE font, editor font size, keymap and "All settings…".
+- Not done yet: light theme, editable keymap, installing packages from the interpreter page.
+
 ---
 
 ## 4. How things were tested
@@ -141,7 +148,7 @@ These run in CI only as "it builds and the unit tests pass". Nobody has used the
 - Run configurations: arguments, environment variables, working directory per project
 - Python console (interactive REPL tool window)
 - Debug tests from a gutter icon (currently only whole test files), conditional breakpoints
-- **Settings dialog** (⌘, / Ctrl+Alt+S): PyCharm's tree (Appearance & Behavior, Keymap, Editor, Project: Python Interpreter, Tools) with the settings that exist today (font size, line height, tab size, reopen last project, …), and a Customize page on the welcome screen. Planned as the next PR.
+- Settings follow-ups: a Light theme, an editable keymap, install/upgrade/remove packages on the Python Interpreter page (together with roadmap item 2)
 - Structure view / breadcrumbs, split editor, local history
 - Jupyter notebook viewer (biggest item)
 - A proper UI test suite in the repo (see section 4)

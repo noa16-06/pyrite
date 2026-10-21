@@ -1,7 +1,7 @@
 import { EditorState, Compartment, EditorSelection } from "@codemirror/state";
 import {
   EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection,
-  dropCursor, rectangularSelection, crosshairCursor, highlightSpecialChars,
+  dropCursor, rectangularSelection, crosshairCursor, highlightSpecialChars, highlightWhitespace,
 } from "@codemirror/view";
 import {
   defaultKeymap, history, historyKeymap, indentWithTab, copyLineDown, deleteLine, moveLineUp, moveLineDown,
@@ -18,6 +18,7 @@ import { tags as t } from "@lezer/highlight";
 import { api, basename } from "./api.js";
 import { fileIcon, icons } from "./icons.js";
 import { editorKeys } from "./platform.js";
+import { settings, softWrapped } from "./settings.js";
 
 // Colors follow PyCharm's "Dark" (New UI) scheme.
 const highlight = HighlightStyle.define([
@@ -124,6 +125,7 @@ export class EditorArea {
     this.active = null;
     this.language = new Compartment();
     this.intel = new Compartment();
+    this.prefs = new Compartment(); // Settings | Editor
     // Set by the code-insight layer: extension(path), beforeSwitch(), activated(path), changed(path), closed(path).
     this.hooks = {};
 
@@ -135,7 +137,7 @@ export class EditorArea {
   extensions(ref) {
     const path = ref.path;
     return [
-      lineNumbers(),
+      this.prefs.of(this.prefExtensions(path)),
       highlightActiveLineGutter(),
       highlightSpecialChars(),
       history(),
@@ -144,8 +146,6 @@ export class EditorArea {
       dropCursor(),
       EditorState.allowMultipleSelections.of(true),
       indentOnInput(),
-      indentUnit.of("    "),
-      EditorState.tabSize.of(4),
       syntaxHighlighting(highlight),
       bracketMatching(),
       closeBrackets(),
@@ -175,6 +175,39 @@ export class EditorArea {
         if (u.selectionSet || u.docChanged) this.reportCursor();
       }),
     ];
+  }
+
+  /** Extensions that follow Settings | Editor (font, line numbers, wraps, Code Style). */
+  prefExtensions(path) {
+    const s = settings();
+    return [
+      s.lineNumbers ? lineNumbers() : [],
+      indentUnit.of(s.useTabs ? "\t" : " ".repeat(s.indent)),
+      EditorState.tabSize.of(s.tabSize),
+      softWrapped(path) ? EditorView.lineWrapping : [],
+      s.showWhitespace ? highlightWhitespace() : [],
+      EditorView.theme({
+        "&": { fontSize: `${s.editorFontSize}px` },
+        ".cm-scroller": {
+          fontFamily: `"${s.editorFont}", "JetBrains Mono", Menlo, Consolas, monospace`,
+          lineHeight: String(s.lineHeight),
+          fontVariantLigatures: s.ligatures ? "normal" : "none",
+          fontFeatureSettings: s.ligatures ? "normal" : '"liga" 0, "calt" 0',
+        },
+      }),
+    ];
+  }
+
+  /** Re-applies the editor settings to every open tab. */
+  applySettings() {
+    for (const path of this.order) {
+      const effects = this.prefs.reconfigure(this.prefExtensions(path));
+      if (path === this.active) this.view.dispatch({ effects });
+      else {
+        const tab = this.tabs.get(path);
+        tab.state = tab.state.update({ effects }).state;
+      }
+    }
   }
 
   has(path) {
@@ -249,12 +282,13 @@ export class EditorArea {
     return tab ? !this.currentState(path).doc.eq(tab.saved) : false;
   }
 
-  // PyCharm saves automatically; we do the same shortly after you stop typing.
+  // PyCharm saves automatically once the IDE is idle (Settings | System Settings | Autosave).
   markChanged(path) {
     const tab = this.tabs.get(path);
     if (!tab) return;
     clearTimeout(tab.saveTimer);
-    tab.saveTimer = setTimeout(() => this.save(path), 1000);
+    const { saveIdle, saveIdleSeconds } = settings();
+    if (saveIdle) tab.saveTimer = setTimeout(() => this.save(path), saveIdleSeconds * 1000);
     this.renderTabs();
   }
 

@@ -28,6 +28,8 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
         &[
             &PredefinedMenuItem::about(app, Some("About Pyrite"), None)?,
             &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(app, "settings", "Settings…", true, Some("CmdOrCtrl+,"))?,
+            &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::hide(app, None)?,
             &PredefinedMenuItem::hide_others(app, None)?,
             &PredefinedMenuItem::show_all(app, None)?,
@@ -139,6 +141,7 @@ pub fn run() {
             projects::find_pythons,
             projects::create_project,
             projects::has_uv,
+            projects::list_packages,
             lsp::lsp_start,
             lsp::lsp_send,
             lsp::lsp_stop,
