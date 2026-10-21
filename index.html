@@ -98,7 +98,7 @@
         <span id="sb-pos"></span>
         <span>LF</span>
         <span>UTF-8</span>
-        <span>4 spaces</span>
+        <span id="sb-indent">4 spaces</span>
         <button id="sb-lsp"></button>
         <button id="sb-interp" title="Python Interpreter — click to change">No interpreter</button>
       </footer>
@@ -113,6 +113,7 @@
             </div>
           </div>
           <button class="welcome-nav active" data-page="projects">Projects</button>
+          <button class="welcome-nav" data-page="customize">Customize</button>
         </aside>
         <section class="welcome-main" id="welcome-projects">
           <div class="welcome-top">
@@ -129,6 +130,16 @@
               <button id="welcome-open-big"><span class="big-icon" data-icon="folder"></span>Open</button>
             </div>
           </div>
+        </section>
+        <section class="welcome-main" id="welcome-customize" style="display: none">
+          <h2 class="customize-title">Customize</h2>
+          <div class="customize-form">
+            <div class="form-row"><label>Color theme:</label><select disabled><option>Dark</option></select></div>
+            <div class="form-row"><label>IDE font:</label><select id="cz-ui-size"></select></div>
+            <div class="form-row"><label>Editor font size:</label><select id="cz-editor-size"></select></div>
+            <div class="form-row"><label>Keymap:</label><select disabled><option id="cz-keymap"></option></select></div>
+          </div>
+          <button class="link" id="cz-all">All settings…</button>
         </section>
       </div>
 

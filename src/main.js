@@ -18,6 +18,7 @@ import { Breakpoints, breakpointGutter, refreshBreakpoints } from "./breakpoints
 import { Debugger } from "./debugger.js";
 import { overlay, closeOverlay, contextMenu, promptModal, toast } from "./popups.js";
 import { newProjectDialog } from "./newproject.js";
+import { settings, saveSettings, onSettingsChange, openSettings, applyAppearance, indentLabel } from "./settings.js";
 
 const $ = (sel) => document.querySelector(sel);
 const appWindow = getCurrentWindow();
@@ -851,6 +852,8 @@ function mainMenuItems() {
         { label: "Recent Projects", children: recents.length ? recents : [{ label: "No recent projects" }] },
         item("Close Project", "closeProject", { enabled: open }),
         "-",
+        item("Settings…", "settings", { icon: icons.config }),
+        "-",
         item("Save All", "saveAll", { enabled: open }),
         item("Reload All from Disk", "reloadAll", { icon: icons.refresh, enabled: open }),
         "-",
@@ -892,6 +895,7 @@ listen("menu", (e) => runCommand(e.payload)).catch(() => {});
 // ---------------------------------------------------------------- shortcuts (PyCharm keymap for this OS)
 const actions = {
   saveAll: () => editor.saveAll(),
+  settings: () => showSettings(),
   newElement: () => newElement(),
   recentFiles: () => recentFiles(),
   reloadAll: () => reloadAll(),
@@ -981,12 +985,62 @@ window.addEventListener("keyup", (e) => {
   } else lastShift = now;
 });
 
-window.addEventListener("blur", () => editor.saveAll()); // save on frame deactivation, like PyCharm
+// Save on frame deactivation and when the built-in terminal takes focus, like PyCharm.
+window.addEventListener("blur", () => settings().saveOnDeactivation && editor.saveAll());
+$("#terminal-view").addEventListener("focusin", () => settings().saveOnDeactivation && editor.saveAll());
+
+// ---------------------------------------------------------------- settings
+function showSettings(page) {
+  openSettings(
+    {
+      projectName: state.root ? basename(state.root) : null,
+      interpreter: state.interpreter,
+      setInterpreter,
+      defaultProjectsDir: null,
+    },
+    page
+  );
+}
+
+function applySettings() {
+  applyAppearance();
+  editor.applySettings();
+  $("#sb-indent").textContent = indentLabel();
+  renderCustomize();
+}
+onSettingsChange(applySettings);
+$("#sb-indent").addEventListener("click", () => state.root && showSettings("codestyle"));
+
+// Welcome screen | Customize: the few settings PyCharm puts on its welcome screen.
+function renderCustomize() {
+  const s = settings();
+  const sizes = (sel, values, current) => {
+    sel.replaceChildren(...values.map((v) => new Option(String(v), String(v))));
+    sel.value = String(current);
+  };
+  sizes($("#cz-ui-size"), [11, 12, 13, 14, 15, 16], s.uiCustomFont ? s.uiFontSize : 13);
+  sizes($("#cz-editor-size"), [11, 12, 13, 14, 15, 16, 18, 20], s.editorFontSize);
+  $("#cz-keymap").textContent = isMac ? "macOS" : "Windows / Linux";
+}
+$("#cz-ui-size").addEventListener("change", (e) => {
+  const size = Number(e.target.value);
+  saveSettings({ uiCustomFont: size !== 13 || settings().uiCustomFont, uiFontSize: size });
+});
+$("#cz-editor-size").addEventListener("change", (e) => saveSettings({ editorFontSize: Number(e.target.value) }));
+$("#cz-all").addEventListener("click", () => showSettings());
+for (const b of document.querySelectorAll(".welcome-nav")) {
+  b.addEventListener("click", () => {
+    for (const n of document.querySelectorAll(".welcome-nav")) n.classList.toggle("active", n === b);
+    $("#welcome-projects").style.display = b.dataset.page === "projects" ? "" : "none";
+    $("#welcome-customize").style.display = b.dataset.page === "customize" ? "" : "none";
+  });
+}
 
 // ---------------------------------------------------------------- start
 applyLayout();
 renderWelcome();
 const [lastProject] = recentProjects();
-if (lastProject && store.get("reopenLast", true)) openProject(lastProject).catch(() => closeProject());
+applySettings();
+if (lastProject && settings().reopenLast) openProject(lastProject).catch(() => closeProject());
 
 if (import.meta.env.DEV) window.__pyrite = { editor, intel, debug, breakpoints }; // for automated UI checks
