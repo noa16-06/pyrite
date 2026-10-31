@@ -170,7 +170,7 @@ Every item below also has a GitHub issue (#10–#26); the README's "What we stil
 
 ## 7. Known issues and limitations
 
-- pyright logs `File or directory "/<default workspace root>" does not exist` at startup. It's harmless: `@codemirror/lsp-client` sends `rootUri` but no `workspaceFolders`.
+- The LSP transport now adds the project `workspaceFolders` to initialization alongside CodeMirror's `rootUri` (#23). `node --test tests/intelligence.test.mjs` covers POSIX/Windows URI names and preservation of other messages; a synthetic stdio check with basedpyright 1.40.2 reproduced the placeholder-root warning without the field and verified it disappears with the project workspace. Native-app verification remains separate.
 - Branch protection is only local (hooks); `--no-verify` bypasses it. Enforcing it on GitHub needs GitHub Pro or a public repo.
 - Breakpoints sit in their own gutter left of the line numbers. PyCharm draws them over the line numbers instead.
 - debugpy groups globals into "special/function/class variables" folders, unlike PyCharm's flat list.
