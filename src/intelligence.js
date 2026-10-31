@@ -53,7 +53,7 @@ export function sanitizeHTML(html) {
 
 // ------------------------------------------------------------ transport
 /** Bridges the LSP client to a server process run by the Rust backend. */
-class TauriTransport {
+export class TauriTransport {
   constructor({ onServerRequest, onExit }) {
     this.handlers = new Set();
     this.onServerRequest = onServerRequest;
@@ -89,6 +89,13 @@ class TauriTransport {
   send(message) {
     if (this.id == null) throw new Error("Language server is not running");
     const id = this.id;
+    const request = JSON.parse(message);
+    // CodeMirror sends rootUri but not workspaceFolders; basedpyright needs the latter.
+    if (request.method === "initialize" && request.params?.rootUri && request.params.workspaceFolders == null) {
+      const uri = request.params.rootUri;
+      request.params.workspaceFolders = [{ uri, name: basename(uriToPath(uri)) || "/" }];
+      message = JSON.stringify(request);
+    }
     this.queue = this.queue.then(() => api.lspSend(id, message)).catch(() => {});
   }
 
